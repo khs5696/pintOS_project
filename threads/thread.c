@@ -63,6 +63,10 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+// HS 1-1-1. 잠자는 스레드들을 모아두는 리스트 & 가장 먼저 깨워야할 시간
+static struct list sleep_list;
+static int64_t next_tick_to_awake;
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -115,6 +119,9 @@ thread_init (void) {
 	init_thread (initial_thread, "main", PRI_DEFAULT);
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
+
+	// HS 1-1-1. 잠자는 스레드들의 목록 초기화
+	list_init(&sleep_list);
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -587,4 +594,59 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+// HS 1-1-2. 일어나야할 tick을 관리하기 위한 함수
+// 가장 먼저 깨워야할 시간(틱) 업데이트
+void update_next_tick_to_awake(int64_t ticks) {
+	next_tick_to_awake = ( next_tick_to_awake > ticks ) ? ticks : next_tick_to_awake;
+}
+
+int64_t get_next_tick_to_awake(void) {
+	return next_tick_to_awake;
+}
+
+// HS 1-1-3. 스레드를 ticks까지 block 상태(sleep)로 만들어준다.
+void thread_sleep(int64_t ticks) {
+	struct thread * cur;
+
+	// 인터럽트를 금지하고 이전 인터럽트 레벨 저장
+	enum intr_level old_level;
+	old_level = intr_disable();
+
+	cur = thread_current();
+	ASSERT(cur != idle_thread);
+
+	// 가장 먼저 깨워야할 시간을 업데이트하고
+	// sleep_list에 block한 스레드 추가
+	update_next_tick_to_awake(cur->wakeup_tick = ticks);
+	list_push_back(&sleep_list, &cur->elem);
+	thread_block();
+
+	intr_set_level(old_level);
+}
+
+
+// HS 1-1-4. sleep_list의 스레드들을 순회하면서 깨운다.
+void thread_awake(int64_t wakeup_tick) {
+	next_tick_to_awake = INT64_MAX;
+	struct list_elem *e;
+	e = list_begin(&sleep_list);
+
+	// sleep_list의 처음부터 마지막까지 순회
+	while(e != list_end(&sleep_list)) {
+		// 해당 구조체의 시작점을 계산하는 함수
+		// list_elem(e)로부터 struct(thread) 형태를 반환하는 define 문
+		struct thread * t = list_entry(e, struct thread, elem);
+
+		// 깨워야할 시간보다 스레드의 기상 시간이 빠른 경우
+		// sleep_list에서 제거하고 unblock
+		if (wakeup_tick >= t->wakeup_tick) {
+			e = list_remove(&t -> elem);
+			thread_unblock(t);
+		} else {
+			e = list_next(e);
+			update_next_tick_to_awake(t->wakeup_tick);
+		}
+	}
 }

@@ -107,6 +107,10 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+
+	// HS 1-1-0. 스레드가 일어나야할 시간(tick)에 대한 정보
+	int64_t wakeup_tick;
+
 };
 
 /* If false (default), use round-robin scheduler.
@@ -142,5 +146,12 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+// HS 1-1
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+void update_next_tick_to_awake(int64_t ticks);
+int64_t get_next_tick_to_awake(void);
+
 
 #endif /* threads/thread.h */
