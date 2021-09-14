@@ -79,12 +79,13 @@ Differences in `diff -u' format:
 - (priority-donate-chain) interloper 2 finished.
 - (priority-donate-chain) thread 1 finishing with priority 3.
 - (priority-donate-chain) interloper 1 finished.
-+ (priority-donate-chain) main should have priority 3.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 6.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 9.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 12.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 15.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 18.  Actual priority: 0.
-+ (priority-donate-chain) main should have priority 21.  Actual priority: 0.
-  (priority-donate-chain) main finishing with priority 0.
+- (priority-donate-chain) main finishing with priority 0.
++ (priority-donate-chain) main should have priority 3.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 6.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 9.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 12.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 15.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 18.  Actual priority: 31.
++ (priority-donate-chain) main should have priority 21.  Actual priority: 31.
++ (priority-donate-chain) main finishing with priority 31.
   (priority-donate-chain) end

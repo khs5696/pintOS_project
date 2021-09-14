@@ -66,7 +66,10 @@ sema_down (struct semaphore *sema) {
 
 	old_level = intr_disable ();
 	while (sema->value == 0) {
-		list_push_back (&sema->waiters, &thread_current ()->elem);
+		// HS 1-3-1. 실행 중인 스레드가 CA를 사용하고자 할 때
+		// 우선순위에 따라 정렬하여 sema의 waiters 리스트에 삽입한다.
+		list_insert_ordered(&sema->waiters, &thread_current ()->elem, cmp_priority, NULL);
+
 		thread_block ();
 	}
 	sema->value--;
@@ -109,11 +112,22 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)) {
+		// HS 1-3-2. 공유자원을 사용하기 위해 waiters에서 스레드 한 개를 unblock한다.
+		// waiters에서 대기 중일 때, 우선순위가 변경될 수도 있으므로 unblock하기 전에 정렬하낟.
+		list_sort(&sema->waiters, cmp_priority, NULL);
+
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
-	sema->value++;
-	intr_set_level (old_level);
+		sema->value++;
+		intr_set_level (old_level);
+
+		// 공유자원을 사용하기 위해 대기 중인 스레드가 있다면, waiters에서 선점한다.
+		thread_yield();
+	} else {
+		sema->value++;
+		intr_set_level (old_level);
+	}
 }
 
 static void sema_test_helper (void *sema_);
@@ -188,7 +202,22 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	// 1-5-1. lock_acquire할 때, 다른 스레드(holder)가 lock을 사용하고 있다면
+	// holder에게 우선순위를 양보한다.
+	int current_priority = thread_current()->priority;
+
+	if(lock->holder != NULL) {
+		// donate와 관련된 변수 업데이트
+		// 양보 받은 스레드들의 리스트인 donated는 우선순위에 따라 정렬하여 삽입한다.
+		thread_current()->waiting_lock = lock;
+		list_insert_ordered(&lock->holder->donated, &thread_current()->donated_elem, thread_cmp_donate_priority, 0);	
+
+		// holder에게 우선순위 양보
+		donate_priority();
+	}
 	sema_down (&lock->semaphore);
+
+	thread_current()->waiting_lock = NULL;
 	lock->holder = thread_current ();
 }
 
@@ -221,6 +250,12 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+	// HS 1-5-3. 양보받은 스레드의 작업이 완료
+	// 관련 변수(donated) 업데이트
+	donate_priority();
+	// donated 중 가장 큰 값으로 우선 순위 재설정 
+	donated_update(lock);
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
@@ -282,7 +317,11 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	sema_init (&waiter.semaphore, 0);
-	list_push_back (&cond->waiters, &waiter.elem);
+	// HS 1-4-1. 우선순위에 따라 스레드를 실행하되, cond->waiters를 구성하는 세마포어의
+	// waiter(대기 중인 스레드 목록)는 내림차순으로 정렬이 이미 완료된 상태이므로
+	// 세마포어->waiter의 첫번째 스레드끼리 우선 순위를 비교하여 삽입한다.
+	list_insert_ordered (&cond->waiters, &waiter.elem, sema_compare_priority, 0);
+
 	lock_release (lock);
 	sema_down (&waiter.semaphore);
 	lock_acquire (lock);
@@ -303,6 +342,10 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (lock_held_by_current_thread (lock));
 
 	if (!list_empty (&cond->waiters))
+		// HS 1-4-2. cond_wait에서 block 되어 대기하는 도중에 스레드의 우선순위가 바뀌는 경우
+		// 세마포어의 waiter 내부에서는 sema_up에 의해 정렬이 이미 완료되었으므로
+		// 세마포어의 첫 번째 요소들끼리 비교해 정렬한다.
+		list_sort(&cond->waiters, sema_compare_priority, 0);
 		sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 }
@@ -320,4 +363,19 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 
 	while (!list_empty (&cond->waiters))
 		cond_signal (cond, lock);
+}
+
+
+// HS 1-3-0. semaphore의 waiter(대기 중인 스레드 리스트)는 
+// sema_up과 sema_down에 의해 이미 정렬되어 있는 상태
+// 세마포어 waiter의 첫번째 스레드끼리 우선순위를 비교하여 정렬 및 삽입하기 위해
+// 인자로 사용 될 함수를 선언한다.
+// typedef bool list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool sema_compare_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	struct semaphore_elem * sema_a = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem * sema_b = list_entry(b, struct semaphore_elem, elem);
+
+	int sema_a_first = list_entry (list_begin (&(sema_a->semaphore.waiters)), struct thread, elem)->priority;
+	int sema_b_first = list_entry (list_begin (&(sema_b->semaphore.waiters)), struct thread, elem)->priority;
+	return sema_a_first > sema_b_first;
 }

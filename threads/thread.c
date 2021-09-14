@@ -214,6 +214,12 @@ thread_create (const char *name, int priority,
 	/* Add to run queue. */
 	thread_unblock (t);
 
+	// HS 1-2-4. 생성된 스레드의 우선순위가 현재 실행 중인 스레드보다 높을 경우,
+	// 실행 중인 스레드는 CPU를 양보하고 ready_list로 들어간다.
+	if (priority > thread_current()->priority) {
+		thread_yield();
+	}
+
 	return tid;
 }
 
@@ -247,7 +253,11 @@ thread_unblock (struct thread *t) {
 
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
-	list_push_back (&ready_list, &t->elem);
+
+	// HS 1-2-1. unblock되는 스레드가 ready_list에 들어갈 때 우선순위에 따라 삽입
+	// void list_insert_ordered (struct list *, struct list_elem *, list_less_func *, void *aux);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, 0);
+
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -309,8 +319,12 @@ thread_yield (void) {
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
-	if (curr != idle_thread)
-		list_push_back (&ready_list, &curr->elem);
+
+	// HS 1-2-3. 현재 실행 중인 스레드를 ready 상태로 전환할 경우
+	// 우선순위에 따라 정렬해서 ready_list에 삽입한다.
+	if (curr != idle_thread) {
+		list_insert_ordered (&ready_list, &curr->elem, cmp_priority, 0);
+	}
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
@@ -318,7 +332,15 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current ()->origin_priority = new_priority;
+
+	// HS 1-5-5. 실행 중인 스레드의 변경된 우선순위가 양보받은 값보다 커질 경우를 고려해
+	// donated의 우선순위들과 비교해 업데이트한다.
+	donate_priority();
+
+	// HS 1-2-5. 현재 실행 중인 스레드의 우선순위가 변경되는 경우,
+	// ready_list의 가장 큰 우선순위와 비교하여 업데이트한다.
+	thread_set_priority_update();
 }
 
 /* Returns the current thread's priority. */
@@ -416,6 +438,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	// HS 1-5-0. Donation을 위한 변수 초기화
+	t->origin_priority = priority;				// 스레드의 기존 우선순위
+	t->waiting_lock = NULL;						// 스레드가 기다리고 있는 lock
+	list_init(&t->donated);						// 스레드에게 우선순위를 양보한 스레드의 리스트
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -642,11 +669,60 @@ void thread_awake(int64_t wakeup_tick) {
 		// 깨워야할 시간보다 스레드의 기상 시간이 빠른 경우
 		// sleep_list에서 제거하고 unblock
 		if (wakeup_tick >= t->wakeup_tick) {
-			e = list_remove(&t -> elem);
+			e = list_remove(&t->elem);
 			thread_unblock(t);
 		} else {
 			e = list_next(e);
 			update_next_tick_to_awake(t->wakeup_tick);
 		}
+	}
+}
+
+// HS 1-2-0. list_insert_ordered의 list_less_func 인자로 사용하기 위해, 
+// 두 스레드의 우선순위를 비교하는 함수를 선언한다.
+// typedef bool list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	int priority_a = list_entry(a, struct thread, elem)->priority;
+	int priority_b = list_entry(b, struct thread, elem)->priority;
+	return (priority_a > priority_b);
+}
+
+// HS 1-2-5. ready_list의 첫번째 스레드(가장 큰 우선순위)의 우선순위와
+// 업데이트된 현재 스레드를 비교하여, 값이 더 클 경우 실행 중인 스레드를 변경한다.
+void thread_set_priority_update(void) {
+	if (!list_empty(&ready_list)) {
+		int ready_priority = list_entry(list_front(&ready_list), struct thread, elem)->priority;
+		if (thread_get_priority() < ready_priority) {
+			thread_yield();
+		}
+	}
+}
+
+
+// HS 1-5-1.
+// typedef bool list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool thread_cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	return list_entry(a, struct thread, donated_elem)->priority >  list_entry(a, struct thread, donated_elem)->priority;
+}
+
+// HS 1-5-2. nested donation을 고려해서 우선순위 양보
+void donate_priority(void) {
+	struct thread * tmp = thread_current();
+
+	for (int i = 0; i < 8; i++) {
+		if (tmp->waiting_lock == NULL) { break; }
+		tmp->waiting_lock->holder->priority = tmp->priority;
+		tmp = tmp->waiting_lock->holder;
+	}
+}
+
+// HS 1-5-3. donated 업데이트
+void donated_update(struct lock * lock) {
+	struct list_elem *e;
+	struct thread * cur = thread_current();
+
+	for (e = list_begin(&cur->donated); e != list_end(&cur->donated); e = list_next(e)) {
+		struct thread * t = list_entry(e, struct thread, donated_elem);
+		if (t->waiting_lock == lock) { list_remove(&t->donated_elem); }
 	}
 }

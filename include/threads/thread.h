@@ -111,6 +111,11 @@ struct thread {
 	// HS 1-1-0. 스레드가 일어나야할 시간(tick)에 대한 정보
 	int64_t wakeup_tick;
 
+	// HS 1-5-0. Donation을 위한 변수
+	int origin_priority;				// 스레드의 기존 우선순위
+	struct lock * waiting_lock;			// 스레드가 기다리고 있는 lock
+	struct list donated;				// 스레드에게 우선순위를 양보한 스레드의 리스트
+	struct list_elem donated_elem;
 };
 
 /* If false (default), use round-robin scheduler.
@@ -153,5 +158,12 @@ void thread_awake(int64_t ticks);
 void update_next_tick_to_awake(int64_t ticks);
 int64_t get_next_tick_to_awake(void);
 
+// HS 1-2
+bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void thread_set_priority_update(void);
 
+// HS 1-5
+bool thread_cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void donate_priority(void);
+void donated_update(struct lock * lock);
 #endif /* threads/thread.h */

@@ -14,11 +14,12 @@ Executing 'mlfqs-block':
 (mlfqs-block) Block thread acquiring lock...
 (mlfqs-block) Main thread spinning for 5 seconds...
 (mlfqs-block) Main thread releasing lock.
+(mlfqs-block) ...got it.
 (mlfqs-block) Block thread should have already acquired lock.
 (mlfqs-block) end
 Execution of 'mlfqs-block' complete.
 Timer: 3023 ticks
 Thread: 500 idle ticks, 2523 kernel ticks, 0 user ticks
-Console: 794 characters output
+Console: 819 characters output
 Keyboard: 0 keys pressed
 Powering off...
