@@ -336,7 +336,7 @@ thread_set_priority (int new_priority) {
 
 	// HS 1-5-5. 실행 중인 스레드의 변경된 우선순위가 양보받은 값보다 커질 경우를 고려해
 	// donated의 우선순위들과 비교해 업데이트한다.
-	donate_priority();
+	reset_priority();
 
 	// HS 1-2-5. 현재 실행 중인 스레드의 우선순위가 변경되는 경우,
 	// ready_list의 가장 큰 우선순위와 비교하여 업데이트한다.
@@ -699,30 +699,55 @@ void thread_set_priority_update(void) {
 }
 
 
-// HS 1-5-1.
+// HS 1-5-1. donated에 정렬해서 삽입하기 위해 인자로 사용될 함수 선언
 // typedef bool list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool thread_cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+bool cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	return list_entry(a, struct thread, donated_elem)->priority >  list_entry(a, struct thread, donated_elem)->priority;
 }
 
 // HS 1-5-2. nested donation을 고려해서 우선순위 양보
+// 우선순위를 양보한 holder가 또 다른 lock을 기다리고 있는 경우를 고려
+// (waiting_lock->holder == NULL)
 void donate_priority(void) {
 	struct thread * tmp = thread_current();
 
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 8; i++) {	
 		if (tmp->waiting_lock == NULL) { break; }
 		tmp->waiting_lock->holder->priority = tmp->priority;
 		tmp = tmp->waiting_lock->holder;
 	}
 }
 
-// HS 1-5-3. donated 업데이트
-void donated_update(struct lock * lock) {
-	struct list_elem *e;
-	struct thread * cur = thread_current();
+// // HS 1-5-3. donated 업데이트
+// void donated_update(struct lock * lock) {
+// 	struct list_elem *e;
+// 	struct thread * cur = thread_current();
 
-	for (e = list_begin(&cur->donated); e != list_end(&cur->donated); e = list_next(e)) {
-		struct thread * t = list_entry(e, struct thread, donated_elem);
-		if (t->waiting_lock == lock) { list_remove(&t->donated_elem); }
+// 	for (e = list_begin(&cur->donated); e != list_end(&cur->donated); e = list_next(e)) {
+// 		struct thread * t = list_entry(e, struct thread, donated_elem);
+// 		if (t->waiting_lock == lock) { list_remove(&t->donated_elem); }
+// 	}
+// }
+
+// HS 1-5-3. donated에서 양보 받은 스레드를 제거해 업데이트한다.
+// release로 반환한 lock = 우선순위를 양보한 스레드의 waiting_lock
+void donated_update(struct lock * lock) {
+	for (struct list_elem * elem = list_begin(&thread_current()->donated); elem != list_end(&thread_current()->donated); elem = list_next(elem)) {
+		struct thread * tmp = list_entry(elem, struct thread, donated_elem);
+		if (lock == tmp->waiting_lock) { list_remove(&tmp->donated_elem); }
+	}
+}
+
+// donated 리스트중 가장 큰 값(또는 origin_priority)으로 우선 순위를 재설정한다. multiple donation 고려
+void reset_priority(void) {
+	thread_current()->priority = thread_current()->origin_priority;
+
+	if (!list_empty(&thread_current()->donated)){
+		list_sort(&thread_current()->donated, cmp_donate_priority, 0);
+		
+		int donated_max_priority = list_entry(list_front(&thread_current()->donated), struct thread, donated_elem)->priority;
+		if (donated_max_priority > thread_current()->priority) {
+			thread_current()->priority = donated_max_priority;
+		}
 	}
 }

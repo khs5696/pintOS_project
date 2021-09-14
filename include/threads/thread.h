@@ -163,7 +163,8 @@ bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *au
 void thread_set_priority_update(void);
 
 // HS 1-5
-bool thread_cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void donate_priority(void);
 void donated_update(struct lock * lock);
+void reset_priority(void);
 #endif /* threads/thread.h */

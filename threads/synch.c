@@ -202,17 +202,16 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
-	// 1-5-1. lock_acquire할 때, 다른 스레드(holder)가 lock을 사용하고 있다면
-	// holder에게 우선순위를 양보한다.
-	int current_priority = thread_current()->priority;
-
+	// 1-5-1. 실행 중인 스레드가 lock_acquire으로 lock을 요청할 때, 
+	// 다른 스레드(holder)가 요청한 lock을 사용하고 있다면
+	// donation과 관련된 변수(waiting_lock, donated)를 업데이트하고
+	// lock->holder에게 우선순위를 양보한다.
 	if(lock->holder != NULL) {
-		// donate와 관련된 변수 업데이트
-		// 양보 받은 스레드들의 리스트인 donated는 우선순위에 따라 정렬하여 삽입한다.
-		thread_current()->waiting_lock = lock;
-		list_insert_ordered(&lock->holder->donated, &thread_current()->donated_elem, thread_cmp_donate_priority, 0);	
+		thread_current()->waiting_lock = lock;				// 실행 중인 스레드의 waiting_lock 업데이트
+		list_insert_ordered(&lock->holder->donated, 		// holder의 donated에 우선순위에 따라 삽입
+			&thread_current()->donated_elem, 
+				cmp_donate_priority, 0);
 
-		// holder에게 우선순위 양보
 		donate_priority();
 	}
 	sema_down (&lock->semaphore);
@@ -251,11 +250,11 @@ lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
-	// HS 1-5-3. 양보받은 스레드의 작업이 완료
-	// 관련 변수(donated) 업데이트
-	donate_priority();
-	// donated 중 가장 큰 값으로 우선 순위 재설정 
+	// HS 1-5-3. 우선순위를 양보받은 스레드의 작업이 완료되면
+	// donation과 관련된 변수(donated) 업데이트 = 양보받은 스레드를 제거
 	donated_update(lock);
+	// donated 리스트중 가장 큰 값으로 우선 순위를 재설정한다.
+	reset_priority();
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
