@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -66,6 +67,9 @@ static tid_t allocate_tid (void);
 // HS 1-1-1. 잠자는 스레드들을 모아두는 리스트 & 가장 먼저 깨워야할 시간
 static struct list sleep_list;
 static int64_t next_tick_to_awake;
+
+// HS 1-6-0. Advanced scheduler을 위한 변수 선언
+int load_avg;
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -132,6 +136,9 @@ thread_start (void) {
 	struct semaphore idle_started;
 	sema_init (&idle_started, 0);
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
+
+	// HS 1-6-0. Advanced scheduler을 위한 변수 초기화
+	load_avg = 0;
 
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -332,6 +339,10 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
+	
+	// HS 1-6-9. advanced scheduler 사용 시 우선순위 변ㅕㅇ 통제
+	if (thread_mlfqs) { return; }
+
 	thread_current ()->origin_priority = new_priority;
 
 	// HS 1-5-5. 실행 중인 스레드의 변경된 우선순위가 양보받은 값보다 커질 경우를 고려해
@@ -349,31 +360,60 @@ thread_get_priority (void) {
 	return thread_current ()->priority;
 }
 
+// HS 1-6-10. advanced scheduler 관련 함수 변경
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
+	// 실행 중인 스레드의 nice 값을 변경한다.
+	// 작업 중 인터럽트는 비활성화시킨다.
+	enum intr_level old_level = intr_disable();
+	thread_current()->nice = nice;
+	// nice가 변경되므로 우선순위도 바뀌고 ready_list에서 대기 중인
+	// 스레드들의 우선순위와 비교해 업데이트한다.
+	calculate_priority(thread_current());
+	thread_set_priority_update();
+
+	intr_set_level (old_level);
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	// 인터럽트를 비활성화시킨 상태에서 현재 스레드의 nice 값을 반환한다.
+	int result;
+
+	enum intr_level old_level = intr_disable();
+	result = thread_current()->nice;
+	intr_set_level (old_level);
+	return result;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	// 인터럽트를 비활성화시킨 상태에서 load_avg에 100을 곱해서 반환한다.
+	int result;
+
+	enum intr_level old_level = intr_disable();
+	result = convert_fixed_to_int(multiple_fixed_int(load_avg, 100));
+	intr_set_level (old_level);
+	return result;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) {
 	/* TODO: Your implementation goes here */
-	return 0;
+	// 인터럽트를 비활성화시킨 상태에서 현재 스레드의 recent_cpu에 100을 곱해서 반환한다.
+	int result;
+
+	enum intr_level old_level = intr_disable();
+	result = convert_fixed_to_int(multiple_fixed_int(thread_current()->recent_cpu, 100));
+	intr_set_level (old_level);
+	return result;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -443,6 +483,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->origin_priority = priority;				// 스레드의 기존 우선순위
 	t->waiting_lock = NULL;						// 스레드가 기다리고 있는 lock
 	list_init(&t->donated);						// 스레드에게 우선순위를 양보한 스레드의 리스트
+
+	// HS 1-6-0. Advanced scheduler을 위한 변수 초기화
+	t->nice = 0;
+	t->recent_cpu = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -750,4 +794,83 @@ void reset_priority(void) {
 			thread_current()->priority = donated_max_priority;
 		}
 	}
+}
+
+// HS 1-6-1. 주어진 스레드의 우선순위를 계산하는 함수
+// PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2) {
+void calculate_priority(struct thread * t) {
+	if (t != idle_thread) {
+		int tmp1 = divide_fixed_int(t->recent_cpu, 4);
+		int tmp2 = subtract_fixed_fixed(convert_int_to_fixed(PRI_MAX), tmp1);
+		int tmp3 = subtract_fixed_int(tmp2, (t->nice * 2));
+		t->priority = convert_fixed_to_int (tmp3);
+	}
+	return;
+}
+
+// HS 1-6-2. 주어진 스레드의 recent_cpu를 계산하는 함수
+// (2 * load_avg) / (2 * load_avg + 1) * t->recent_cpu + t->nice
+void calculate_recent_cpu(struct thread * t) {
+	if (t != idle_thread) {
+		int tmp = multiple_fixed_int(load_avg, 2);
+		int tmp1 = add_fixed_int(tmp, 1);
+		int tmp2 = divide_fixed_fixed(tmp, tmp1);
+		int tmp3 = multiple_fixed_fixed(tmp2, t->recent_cpu);
+		t->recent_cpu = add_fixed_int(tmp3, t->nice);
+	}
+	return;
+}
+
+// HS 1-6-3. 시스템의 load_avg를 계산하는 함수
+// (59/60)*load_avg + (1/60) * ready_threads
+void calculate_load_avg (void) {
+	int ready_threads = 0;
+	ready_threads = list_size(&ready_list);
+
+	if (thread_current() != idle_thread) {
+		ready_threads += 1;
+	}
+
+	int tmp1 = multiple_fixed_int(load_avg, 59);
+	int tmp2 = divide_fixed_int(tmp1, 60);
+	int tmp3 = divide_fixed_fixed(convert_int_to_fixed(1), convert_int_to_fixed(60));
+	int tmp4 = multiple_fixed_int(tmp3, ready_threads);
+	load_avg = add_fixed_fixed(tmp2, tmp4);
+}
+
+// HS 1-6-4. 매 틱마다 실행되고 있는 스레드의 recent_cpu가 1씩 증가
+void update_recent_cpu (void) {
+	if (thread_current() != idle_thread) {
+		thread_current()->recent_cpu = add_fixed_int(thread_current()->recent_cpu, 1);
+	}
+}
+
+// HS 1-6-5. 4 tick마다 모든 스레드의 우선순위 재계산
+void recalculate_priority (void) {
+	struct list_elem * elem;
+
+	for (elem = list_begin(&sleep_list); elem != list_end(&sleep_list); elem = list_next(elem)) {
+		struct thread * t = list_entry(elem, struct thread, elem);
+		calculate_priority(t);
+	}
+	for (elem = list_begin(&ready_list); elem != list_end(&ready_list); elem = list_next(elem)) {
+		struct thread * t = list_entry(elem, struct thread, elem);
+		calculate_priority(t);
+	}
+	calculate_priority(thread_current());
+}
+
+// HS 1-6-6. 1초마다 모든 스레드의 recent_cpu 재계산
+void recalculate_recent_cpu (void) {
+	struct list_elem * elem;
+
+	for (elem = list_begin(&sleep_list); elem != list_end(&sleep_list); elem = list_next(elem)) {
+		struct thread * t = list_entry(elem, struct thread, elem);
+		calculate_recent_cpu(t);
+	}
+	for (elem = list_begin(&ready_list); elem != list_end(&ready_list); elem = list_next(elem)) {
+		struct thread * t = list_entry(elem, struct thread, elem);
+		calculate_recent_cpu(t);
+	}
+	calculate_recent_cpu(thread_current());
 }

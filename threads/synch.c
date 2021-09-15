@@ -202,6 +202,13 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	// HS 1-6-8. advanced scheduler 사용 시 donation 통제
+	if (thread_mlfqs) {
+		sema_down(&lock->semaphore);
+		lock->holder = thread_current();
+		return;
+	}
+
 	// 1-5-1. 실행 중인 스레드가 lock_acquire으로 lock을 요청할 때, 
 	// 다른 스레드(holder)가 요청한 lock을 사용하고 있다면
 	// donation과 관련된 변수(waiting_lock, donated)를 업데이트하고
@@ -249,6 +256,13 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+	// HS 1-6-8. advanced scheduler 사용 시 donation 통제
+	if (thread_mlfqs) {
+		lock->holder = NULL;
+		sema_up(&lock->semaphore);
+		return;
+	}
 
 	// HS 1-5-3. 우선순위를 양보받은 스레드의 작업이 완료되면
 	// donation과 관련된 변수(donated) 업데이트 = 양보받은 스레드를 제거

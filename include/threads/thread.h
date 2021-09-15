@@ -116,6 +116,10 @@ struct thread {
 	struct lock * waiting_lock;			// 스레드가 기다리고 있는 lock
 	struct list donated;				// 스레드에게 우선순위를 양보한 스레드의 리스트
 	struct list_elem donated_elem;
+
+	// HS 1-6-0. Advanced scheduler을 위한 변수
+	int nice;
+	int recent_cpu;
 };
 
 /* If false (default), use round-robin scheduler.
@@ -167,4 +171,13 @@ bool cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, v
 void donate_priority(void);
 void donated_update(struct lock * lock);
 void reset_priority(void);
+
+// HS 1-6
+void calculate_priority(struct thread * t);
+void calculate_recent_cpu(struct thread * t);
+void calculate_load_avg (void);
+
+void update_recent_cpu (void);
+void recalculate_priority (void);
+void recalculate_recent_cpu (void);
 #endif /* threads/thread.h */
