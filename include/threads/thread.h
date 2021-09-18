@@ -106,7 +106,6 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
-	unsigned magic;                     /* Detects stack overflow. */
 
 	// HS 1-1-0. 스레드가 일어나야할 시간(tick)에 대한 정보
 	int64_t ticks_to_wake;
@@ -120,13 +119,15 @@ struct thread {
 	// HS 1-6-0. Advanced scheduler을 위한 변수
 	int nice;
 	int recent_cpu;
+
+	unsigned magic;                     /* Detects stack overflow. */
 };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-
+ 
 void thread_init (void);
 void thread_start (void);
 

@@ -93,7 +93,7 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	// HS 1-1-5. ticks만큼의 시간이 지났을 때 thread가 실행되도록
+	// HS 1-1-3. 실행 중인 스레드를 ticks 동안 sleep 상태로 변경
 	if (ticks <= 0) thread_sleep(timer_ticks());
 	else thread_sleep(timer_ticks() + ticks);
 }
@@ -143,11 +143,11 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 
 	}
 
-	// HS 1-1-6. 매 틱마다 timer_interrupt 함수가 호출
+	// HS 1-1-4. 매 틱마다 timer_interrupt 함수가 호출
 	// 현재 틱에 깨워야할 스레드가 있다면 thread_awake 함수 호출
 	thread_awake(ticks);
 }
-
+ 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
 static bool

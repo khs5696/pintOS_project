@@ -29,7 +29,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-// HS 1-1.
+// HS 1-1-0. sleep 상태(block)의 스레드들이 저장되는 리스트
 static struct list sleep_list;
 
 
@@ -68,7 +68,7 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
-// HS 1-1-0
+// HS 1-1-0. 두 스레드의 일어나야할 시간을 비교하는 함수 선언
 static bool compare_by_wake_ticks (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 // HS 1-6-0. Advanced scheduler을 위한 변수 선언
@@ -127,7 +127,7 @@ thread_init (void) {
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 
-	// HS 1-1-1. 잠자는 스레드들의 목록 초기화
+	// HS 1-1-0. 잠자는 스레드들의 목록 초기화
 	list_init(&sleep_list);
 }
 
@@ -670,15 +670,17 @@ allocate_tid (void) {
 	return tid;
 }
 
-// HS 1-1.
+// HS 1-1-1. 실행중인 스레드(idle_thread 제외)를 ticks까지 block 상태(sleep)로 만들어준다.
 void
 thread_sleep(int64_t wake_ticks) {
 	struct thread *curr = thread_current ();
+	// 인터럽트를 금지하고 이전 인터럽트 레벨 저장
 	enum intr_level old_level;
-
 	ASSERT (!intr_context ());
-
 	old_level = intr_disable ();
+
+	// 스레드 내부의 일어냐야할 시간 변수 업데이트
+	// sleep_list에 먼저 일어나야하는 순서대로 스레드 삽입
 	if (curr != idle_thread) {
 		curr->ticks_to_wake = wake_ticks;
 		list_insert_ordered(&sleep_list, &curr->elem, compare_by_wake_ticks, NULL);
@@ -687,6 +689,7 @@ thread_sleep(int64_t wake_ticks) {
 	intr_set_level(old_level);
 }
 
+// HS 1-1-2. sleep_list의 스레드들을 순회하면서 깨운다.
 void
 thread_awake(int64_t ticks) {
 	if( !list_empty(&sleep_list) && list_entry(list_front(&sleep_list), struct thread, elem)->ticks_to_wake <= ticks) {
@@ -708,10 +711,9 @@ compare_by_wake_ticks (const struct list_elem *a, const struct list_elem *b, voi
 	int64_t ticks_to_wake_b = list_entry(b, struct thread, elem)->ticks_to_wake;
 	if(ticks_to_wake_a < ticks_to_wake_b) return true;
 	else if(ticks_to_wake_a == ticks_to_wake_b) {
-		if(list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority) return true;
+		if (list_entry(a, struct thread, elem)->priority > list_entry(b, struct thread, elem)->priority) return true;
 		else return false;
-	}else return false;
-	// return (ticks_to_wake_a <= ticks_to_wake_b);
+	} else return false;
 }
 
 // HS 1-2-0. list_insert_ordered의 list_less_func 인자로 사용하기 위해, 
@@ -733,7 +735,6 @@ void thread_set_priority_update(void) {
 		}
 	}
 }
-
 
 // HS 1-5-1. donated에 정렬해서 삽입하기 위해 인자로 사용될 함수 선언
 // typedef bool list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
