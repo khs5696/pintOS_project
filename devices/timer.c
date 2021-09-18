@@ -129,18 +129,17 @@ timer_interrupt (struct intr_frame *args UNUSED) {
 	thread_tick ();
 
 	if (thread_mlfqs) {
-		// HS 1-6-4. 매 틱마다 실행 중인 스레드의 recent_cpu + 1
+		// HS 1-6-4. 매 틱마다 실행 중인 스레드의 recent_cpu를 1 증가시킨다.
 		update_recent_cpu();
 		if (ticks % 4 == 0) {
-			// HS 1-6-5. 4 tick마다 모든 스레드의 우선순위 재계산
+			// HS 1-6-5. 4 tick마다 모든 스레드의 우선순위를 재계산한다.
 			recalculate_priority();
 			if (ticks % TIMER_FREQ == 0) {
-				// HS 1-6-6. 매 초마다 모든 스레드의 recent_cpu와 load_avg 재계산
+				// HS 1-6-6. 매 초마다 모든 스레드의 recent_cpu와 load_avg를 재계산한다.
 				recalculate_recent_cpu();
 				calculate_load_avg();
 			}
 		}
-
 	}
 
 	// HS 1-1-6. 매 틱마다 timer_interrupt 함수가 호출

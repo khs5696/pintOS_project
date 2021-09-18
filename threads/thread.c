@@ -69,7 +69,10 @@ static struct list sleep_list;
 static int64_t next_tick_to_awake;
 
 // HS 1-6-0. Advanced scheduler을 위한 변수 선언
-int load_avg;
+int load_avg;				// recent_cpu를 계산하기 위한 변수
+#define NICE_DEFAULT 0
+#define RECENT_CPU_DEFAULT 0
+#define LOAD_AVG_DEFAULT 0
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -138,7 +141,7 @@ thread_start (void) {
 	thread_create ("idle", PRI_MIN, idle, &idle_started);
 
 	// HS 1-6-0. Advanced scheduler을 위한 변수 초기화
-	load_avg = 0;
+	load_avg = LOAD_AVG_DEFAULT;
 
 	/* Start preemptive thread scheduling. */
 	intr_enable ();
@@ -340,7 +343,7 @@ thread_yield (void) {
 void
 thread_set_priority (int new_priority) {
 	
-	// HS 1-6-9. advanced scheduler 사용 시 우선순위 변ㅕㅇ 통제
+	// HS 1-6-9. advanced scheduler 사용 시 우선순위의 변경을 통제한다.
 	if (thread_mlfqs) { return; }
 
 	thread_current ()->origin_priority = new_priority;
@@ -365,14 +368,11 @@ thread_get_priority (void) {
 void
 thread_set_nice (int nice UNUSED) {
 	/* TODO: Your implementation goes here */
-	// 실행 중인 스레드의 nice 값을 변경한다.
-	// 작업 중 인터럽트는 비활성화시킨다.
-	enum intr_level old_level = intr_disable();
-	thread_current()->nice = nice;
-	// nice가 변경되므로 우선순위도 바뀌고 ready_list에서 대기 중인
-	// 스레드들의 우선순위와 비교해 업데이트한다.
-	calculate_priority(thread_current());
-	thread_set_priority_update();
+	enum intr_level old_level = intr_disable();		// 이 때, 작업 중 인터럽트는 비활성화시킨다.
+	thread_current()->nice = nice;					// 실행 중인 스레드의 nice 값을 변경한다.
+	
+	calculate_priority(thread_current());			// nice가 변경되므로 우선순위도 바뀌고 
+	thread_set_priority_update();					// ready_list에서 대기 중인 스레드들과 비교해 우선순위에 따라 스케줄링 되도록 업데이트한다.
 
 	intr_set_level (old_level);
 }
@@ -485,8 +485,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donated);						// 스레드에게 우선순위를 양보한 스레드의 리스트
 
 	// HS 1-6-0. Advanced scheduler을 위한 변수 초기화
-	t->nice = 0;
-	t->recent_cpu = 0;
+	t->nice = NICE_DEFAULT;
+	t->recent_cpu = RECENT_CPU_DEFAULT;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -797,7 +797,7 @@ void reset_priority(void) {
 }
 
 // HS 1-6-1. 주어진 스레드의 우선순위를 계산하는 함수
-// PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2) {
+// priority = PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2) {
 void calculate_priority(struct thread * t) {
 	if (t != idle_thread) {
 		int tmp1 = divide_fixed_int(t->recent_cpu, 4);
@@ -809,7 +809,7 @@ void calculate_priority(struct thread * t) {
 }
 
 // HS 1-6-2. 주어진 스레드의 recent_cpu를 계산하는 함수
-// (2 * load_avg) / (2 * load_avg + 1) * t->recent_cpu + t->nice
+// recent_cpu = (2 * load_avg) / (2 * load_avg + 1) * t->recent_cpu + t->nice
 void calculate_recent_cpu(struct thread * t) {
 	if (t != idle_thread) {
 		int tmp = multiple_fixed_int(load_avg, 2);
@@ -822,9 +822,12 @@ void calculate_recent_cpu(struct thread * t) {
 }
 
 // HS 1-6-3. 시스템의 load_avg를 계산하는 함수
-// (59/60)*load_avg + (1/60) * ready_threads
+// load_avg = (59/60) * load_avg + (1/60) * ready_threads
 void calculate_load_avg (void) {
 	int ready_threads = 0;
+
+	// ready_threads : ready_list 내부의 스레드들의 개수와 실행 중인 스레드의 개수
+	// (idle_thread는 제외한다.)
 	ready_threads = list_size(&ready_list);
 
 	if (thread_current() != idle_thread) {
@@ -838,38 +841,39 @@ void calculate_load_avg (void) {
 	load_avg = add_fixed_fixed(tmp2, tmp4);
 }
 
-// HS 1-6-4. 매 틱마다 실행되고 있는 스레드의 recent_cpu가 1씩 증가
+// HS 1-6-4. 매 틱마다 현재 실행되고 있는 스레드의 recent_cpu가 1씩 증가한다.
+// (idle_thread가 아닐 경우)
 void update_recent_cpu (void) {
 	if (thread_current() != idle_thread) {
 		thread_current()->recent_cpu = add_fixed_int(thread_current()->recent_cpu, 1);
 	}
 }
 
-// HS 1-6-5. 4 tick마다 모든 스레드의 우선순위 재계산
+// HS 1-6-5. 4 tick마다 모든 스레드의 우선순위를 재계산하는 함수
 void recalculate_priority (void) {
-	struct list_elem * elem;
+	struct list_elem * tmp_thread;
 
-	for (elem = list_begin(&sleep_list); elem != list_end(&sleep_list); elem = list_next(elem)) {
-		struct thread * t = list_entry(elem, struct thread, elem);
+	for (tmp_thread = list_begin(&sleep_list); tmp_thread != list_end(&sleep_list); tmp_thread = list_next(tmp_thread)) {
+		struct thread * t = list_entry(tmp_thread, struct thread, elem);
 		calculate_priority(t);
 	}
-	for (elem = list_begin(&ready_list); elem != list_end(&ready_list); elem = list_next(elem)) {
-		struct thread * t = list_entry(elem, struct thread, elem);
+	for (tmp_thread = list_begin(&ready_list); tmp_thread != list_end(&ready_list); tmp_thread = list_next(tmp_thread)) {
+		struct thread * t = list_entry(tmp_thread, struct thread, elem);
 		calculate_priority(t);
 	}
 	calculate_priority(thread_current());
 }
 
-// HS 1-6-6. 1초마다 모든 스레드의 recent_cpu 재계산
+// HS 1-6-6. 1초마다 모든 스레드의 recent_cpu를 재계산하는 함수
 void recalculate_recent_cpu (void) {
-	struct list_elem * elem;
+	struct list_elem * tmp_thread;
 
-	for (elem = list_begin(&sleep_list); elem != list_end(&sleep_list); elem = list_next(elem)) {
-		struct thread * t = list_entry(elem, struct thread, elem);
+	for (tmp_thread = list_begin(&sleep_list); tmp_thread != list_end(&sleep_list); tmp_thread = list_next(tmp_thread)) {
+		struct thread * t = list_entry(tmp_thread, struct thread, elem);
 		calculate_recent_cpu(t);
 	}
-	for (elem = list_begin(&ready_list); elem != list_end(&ready_list); elem = list_next(elem)) {
-		struct thread * t = list_entry(elem, struct thread, elem);
+	for (tmp_thread = list_begin(&ready_list); tmp_thread != list_end(&ready_list); tmp_thread = list_next(tmp_thread)) {
+		struct thread * t = list_entry(tmp_thread, struct thread, elem);
 		calculate_recent_cpu(t);
 	}
 	calculate_recent_cpu(thread_current());

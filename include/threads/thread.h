@@ -118,8 +118,8 @@ struct thread {
 	struct list_elem donated_elem;
 
 	// HS 1-6-0. Advanced scheduler을 위한 변수
-	int nice;
-	int recent_cpu;
+	int nice;							// nice value
+	int recent_cpu;						// 스레드의 최근 CPU 사용량
 };
 
 /* If false (default), use round-robin scheduler.
@@ -180,4 +180,5 @@ void calculate_load_avg (void);
 void update_recent_cpu (void);
 void recalculate_priority (void);
 void recalculate_recent_cpu (void);
+
 #endif /* threads/thread.h */
