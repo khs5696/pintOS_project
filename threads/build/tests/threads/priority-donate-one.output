@@ -18,8 +18,8 @@ Executing 'priority-donate-one':
 (priority-donate-one) This should be the last line before finishing this test.
 (priority-donate-one) end
 Execution of 'priority-donate-one' complete.
-Timer: 24 ticks
-Thread: 0 idle ticks, 24 kernel ticks, 0 user ticks
+Timer: 25 ticks
+Thread: 0 idle ticks, 25 kernel ticks, 0 user ticks
 Console: 941 characters output
 Keyboard: 0 keys pressed
 Powering off...

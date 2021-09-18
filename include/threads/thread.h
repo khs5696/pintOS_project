@@ -109,7 +109,7 @@ struct thread {
 	unsigned magic;                     /* Detects stack overflow. */
 
 	// HS 1-1-0. 스레드가 일어나야할 시간(tick)에 대한 정보
-	int64_t wakeup_tick;
+	int64_t ticks_to_wake;
 
 	// HS 1-5-0. Donation을 위한 변수
 	int origin_priority;				// 스레드의 기존 우선순위
@@ -159,11 +159,9 @@ void do_iret (struct intr_frame *tf);
 // HS 1-1
 void thread_sleep(int64_t ticks);
 void thread_awake(int64_t ticks);
-void update_next_tick_to_awake(int64_t ticks);
-int64_t get_next_tick_to_awake(void);
 
 // HS 1-2
-bool cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool compare_by_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void thread_set_priority_update(void);
 
 // HS 1-5
