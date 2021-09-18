@@ -218,9 +218,9 @@ lock_acquire (struct lock *lock) {
 		thread_current()->waiting_lock = lock;				// 실행 중인 스레드의 waiting_lock 업데이트
 		list_insert_ordered(&lock->holder->donated, 		// holder의 donated에 우선순위에 따라 삽입
 			&thread_current()->donated_elem, 
-				cmp_donate_priority, 0);
+				compare_donate_priority, 0);
 
-		donate_priority();
+		donation();
 	}
 	sema_down (&lock->semaphore);
 
@@ -269,7 +269,7 @@ lock_release (struct lock *lock) {
 	// donation과 관련된 변수(donated) 업데이트 = 양보받은 스레드를 제거
 	donated_update(lock);
 	// donated 리스트중 가장 큰 값으로 우선 순위를 재설정한다.
-	reset_priority();
+	reset_donation();
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
@@ -392,6 +392,5 @@ compare_by_sema_elem_priority (const struct list_elem *a, const struct list_elem
 
 	int sema_a_first = list_entry (list_begin (&(sema_a->semaphore.waiters)), struct thread, elem)->priority;
 	int sema_b_first = list_entry (list_begin (&(sema_b->semaphore.waiters)), struct thread, elem)->priority;
-	// printf("sema_a_first: %d, sema_b_first: %d\n", sema_a_first, sema_b_first);
 	return sema_a_first > sema_b_first;
 }

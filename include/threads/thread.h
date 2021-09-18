@@ -166,10 +166,10 @@ bool compare_by_priority(const struct list_elem *a, const struct list_elem *b, v
 void thread_set_priority_update(void);
 
 // HS 1-5
-bool cmp_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-void donate_priority(void);
+bool compare_donate_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+void donation(void);
 void donated_update(struct lock * lock);
-void reset_priority(void);
+void reset_donation(void);
 
 // HS 1-6
 void calculate_priority(struct thread * t);
