@@ -304,18 +304,20 @@ int process_exec(void *f_name)
 		len = strlen(save_arg[i]) + 1;				// '\0'도 포함
 		command_len += len;						// alignment를 위해 command_len 업데이트
 		_if.rsp = (char *)_if.rsp - len;		// token의 크기만큼 rsp(stack pointer) 이동
-		memcpy (_if.rsp, save_arg[i], len);			// rsp에 token을 복사
+		memcpy (_if.rsp, save_arg[i], len);		// rsp에 token을 복사
 		command_address[i] = (char *) _if.rsp;	// 각 token의 주소를 배열에 저장
 	}
 
 	// Alignment를 위해 padding 영역만큼 rsp 이동
-	int align_padding = sizeof(uintptr_t) - (command_len % sizeof(uintptr_t));
+	if ((command_len % sizeof(uintptr_t)) != 0) {	
+		int align_padding = sizeof(uintptr_t) - (command_len % sizeof(uintptr_t));
+		_if.rsp = (char *)_if.rsp - align_padding;
+	}
 	// while(align_padding != 0) {
 	// 	_if.rsp = (char *)_if.rsp - 1;
 	// 	* _if.rsp = 0;
 	// 	align_padding--;
 	// }
-	_if.rsp = (char *)_if.rsp - align_padding;
 
 	// 0 삽입 & token의 주소들을 순서대로 stack에 삽입
 	_if.rsp = (char *)_if.rsp - sizeof(char *);
@@ -332,7 +334,7 @@ int process_exec(void *f_name)
     _if.R.rdi = token_cnt - 1;
     _if.R.rsi = (uintptr_t *)_if.rsp + 1;
 
-    // hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+    hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
     /* Start switched process. */
     do_iret(&_if);
