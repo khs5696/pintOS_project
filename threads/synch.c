@@ -123,7 +123,9 @@ sema_up (struct semaphore *sema) {
 		sema->value++;
 		if(t->priority > thread_get_priority()) {
 			// 공유자원을 사용하기 위해 대기 중인 스레드가 있다면, waiters에서 선점한다.
-			thread_yield();
+			if (!intr_context()) {
+				thread_yield();
+			}
 		}
 	}else {
 		sema->value++;

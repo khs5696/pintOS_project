@@ -164,6 +164,33 @@ int
 process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
+	
+	printf("\n\n\n%s\n\n\n", file_name);
+	/* HS 2-1-0. Command Line Parsing을 위한 변수 선언 */
+	// Command Parsing 관련 변수
+	char * f_name_copy;				// f_name을 토큰화하기 위해 복사할 변수
+	char * ptr;						// strtok_r()
+	char * next_ptr;
+	char * argv[128];				// command의 토큰(문자열)을 저장할 배열
+	int argc = 0; 					// 토큰의 개수
+
+	// Stack Organization 관련 변수
+	int command_len = 0;			// alignment를 위해 token들이 stack에서 차지하는 byte
+	char * command_address[128];	// stack에서의 각 token 주소(포인터)를 저장할 배열
+
+	/* HS 2-1-1. Command Parsing */
+	// strtok_r()로 토큰화하기 위해 f_name을 복사
+	strlcpy(f_name_copy, f_name, strlen(f_name));
+
+	// 토큰화한 f_name을 배열 argv에 순서대로 삽입
+	ptr = strtok_r(f_name_copy, " ", &next_ptr);
+	argv[argc] = ptr;
+	while (ptr) {
+		argc ++;	
+		ptr = strtok_r(NULL, " ", &next_ptr);
+		argv[argc] = ptr;
+	}
+	printf("load success?\n");
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -179,10 +206,51 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	printf("load success\n");
+
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
 		return -1;
+
+	/* HS 2-1-2. Stack Organization */
+	// argv에 저장된 token을 순서대로 stack에 삽입
+	int len = 0;
+	for (int i = argc - 1; i > -1; i--) {
+		len = strlen(argv[i]) + 1;				// '\0'도 포함
+		command_len += len;						// alignment를 위해 command_len 업데이트
+		_if.rsp = (char *)_if.rsp - len;		// token의 크기만큼 rsp(stack pointer) 이동
+		memcpy (_if.rsp, argv[i], len);			// rsp에 token을 복사
+		command_address[i] = (char *) _if.rsp;	// 각 token의 주소를 배열에 저장
+	}
+
+	// Alignment를 위해 padding 영역만큼 rsp 이동
+	int align_padding = sizeof(uintptr_t) - (command_len % sizeof(uintptr_t));
+	// while(align_padding != 0) {
+	// 	_if.rsp = (char *)_if.rsp - 1;
+	// 	* _if.rsp = 0;
+	// 	align_padding--;
+	// }
+	_if.rsp = (char *)_if.rsp - align_padding;
+
+	// 0 삽입 & token의 주소들을 순서대로 stack에 삽입
+	_if.rsp = (char *)_if.rsp - sizeof(char *);
+	*(uint64_t *) _if.rsp = 0;
+	for (int i = argc-1; i > -1; i--) {
+		_if.rsp = (char *)_if.rsp - sizeof(char *);
+		*(uint64_t *) _if.rsp = command_address[i];
+	}
+
+	// return address 삽입
+	_if.rsp = (char *)_if.rsp - sizeof(uintptr_t *);
+	*(uint64_t *)_if.rsp = 0;
+
+	/* HS 2-1-3. 레지스터 업데이트 */
+	_if.R.rdi = argc;
+    _if.R.rsi = (uintptr_t *)_if.rsp + 1;
+
+	printf('sibal\n');
+	hex_dump(0, _if.rsp, 1000, 1);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -204,6 +272,8 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	int i;
+	for (i = 0; i < 1000000000; i++);
 	return -1;
 }
 
