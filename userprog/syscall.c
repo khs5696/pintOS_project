@@ -37,10 +37,76 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 
+
+// argument로 주어진 포인터가 유저 메모리 영역(0 ~ KERN_BASE)인지 확인
+// 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
+void check_address (void * addr) {
+	if ((uint64_t)addr >= 0x8004000000) {
+		exit(-1);
+	}
+}
+
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	printf ("system call!\n");
-	thread_exit ();
+	// HS 2-2-1. syscall_handler 구현
+	memcpy(thread_current()->tf, f, sizeof(struct intr_frame));
+
+	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 해당 시스템 콜(f->R.rax)을 switch문으로 호출
+	// argument가 필요한 시스템 콜의 경우, f->R.rdi가 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
+	switch (f->R.rax) {
+		case SYS_HALT:
+			halt();
+			break;
+		case SYS_EXIT:
+			exit(f->R.rdi);
+			break;
+		case SYS_FORK:
+			check_address(f->R.rdi);
+			f->R.rax = fork(f->R.rdi);
+			break;
+		case SYS_EXEC:
+			check_address(f->R.rdi);
+			f->R.rax = exec(f->R.rdi);
+			break;
+		case SYS_WAIT:
+			f->R.rax = wait(f->R.rdi);
+			break;
+		case SYS_CREATE:
+			check_address(f->R.rdi);
+			f->R.rax = create(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_REMOVE:
+			check_address(f->R.rdi);
+			f->R.rax = remove(f->R.rdi);
+			break;
+		case SYS_OPEN:
+			check_address(f->R.rdi);
+			f->R.rax = open(f->R.rdi);
+			break;
+		case SYS_FILESIZE:
+			f->R.rax = filesize(f->R.rdi);
+			break;
+		case SYS_READ:
+			check_address(f->R.rsi);
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_WRITE:
+			check_address(f->R.rsi);
+			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+			break;
+		case SYS_SEEK:
+			seek(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_TELL:
+			f->R.rax = tell(f->R.rdi);
+			break;
+		case SYS_CLOSE:
+			close(f->R.rdi);
+			break;
+		default:
+			thread_exit();
+			break;
+	}
 }
