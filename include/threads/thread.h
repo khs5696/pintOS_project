@@ -121,16 +121,13 @@ struct thread {
 	int nice;
 	int recent_cpu;
 
-	unsigned magic;                     /* Detects stack overflow. */
-
-	// HS fork
-	struct intr_frame tf_fork;
-	struct file * file_list[128];
-	struct list child_list;	// 자식 스레드들에 대한 리스트
+	int exit_status;
+	struct list child_list;
 	struct list_elem child_elem;
 	struct semaphore fork_sema;
-	int exit_status;
-	struct thread * parent_thread;
+	struct thread * parent_thread;	
+
+	unsigned magic;                     /* Detects stack overflow. */
 };
 
 /* If false (default), use round-robin scheduler.
