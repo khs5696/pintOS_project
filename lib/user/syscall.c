@@ -92,7 +92,7 @@ exec (const char *file) {
 
 int
 wait (pid_t pid) {
-	return syscall1 (SYS_WAIT, pid);
+	return syscall1 (SYS_WAIT, pid); 
 }
 
 bool
