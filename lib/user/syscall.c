@@ -84,7 +84,7 @@ pid_t
 fork (const char *thread_name){
 	return (pid_t) syscall1 (SYS_FORK, thread_name);
 }
-
+	
 int
 exec (const char *file) {
 	return (pid_t) syscall1 (SYS_EXEC, file);

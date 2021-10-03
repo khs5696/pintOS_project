@@ -82,8 +82,13 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+
+	/* HS. process_fork */
+	thread_current()->tf_fork = *if_;
+	
+	// do_fork(thread_current())를 실행하는 스레드(자식 프로세스) 생성
+	// -> thread_current()의 context를 복제
+	return thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());
 }
 
 #ifndef VM
@@ -154,11 +159,19 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	for(int i = 0; i < 128; i ++) {
+		lock_acquire(&file_lock);
+		current->file_list[i] = file_duplicate(parent->file_list[i]);
+		lock_release(&file_lock);
+	}
+
+	// 부모 스레드의 포인터
 
 	process_init ();
 
 	/* Finally, switch to the newly created process. */
-	if (succ)
+	if (succ)	
+		if_.R.rax = 0; 
 		do_iret (&if_);
 error:
 	thread_exit ();
@@ -262,7 +275,22 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while(1);
+	struct thread * t = NULL;
+	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+		t = list_entry(e, struct thread, child_elem);
+		if (t->tid == child_tid) {
+			break;
+		}
+	}
+	if(t == NULL) {
+		return -1;
+	}
+	sema_down(&thread_current()->fork_sema);
+	// process_exit() 
+	int result = t->exit_status;
+	thread_unblock(t);
+
+	return result;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -274,10 +302,27 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	// HS
-	
+	// Copy
+	// 파일들 종료
+	struct list_elem * e;
 
+	for (int i = 0; i < 128; i++) {
+		close(&curr->file_list[i]);
+	}
+
+	// 종료하려는 스레드의 자식 스레드를 전부 강제 종료 & child_list에서 연결을 끊어줘야한다.
+	while(!list_empty(&curr->child_list)) {
+		e = list_begin(&curr->child_list);
+		struct thread * child = list_entry(e, struct thread, child_elem);
+		free(child);
+	}
 	process_cleanup ();
+	sema_up(&curr->parent_thread->fork_sema);
+
+	enum intr_level old_level;
+	old_level = intr_disable ();
+	thread_block();
+	intr_set_level (old_level);
 }
 
 /* Free the current process's resources. */

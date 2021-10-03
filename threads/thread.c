@@ -221,6 +221,11 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+#ifdef USERPROG
+	list_push_back(&thread_current()->child_list, &(t->child_elem));	// 부모 스레드의 child_list에 자식 스레드(t) 추가
+	t->parent_thread = thread_current(); 								// 자식 스레드(t)에 부모 스레드를 추가
+	sema_init(&thread_current()->fork_sema, 0);
+#endif
 	/* Add to run queue. */
 	thread_unblock (t);
 
@@ -490,6 +495,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	// HS 1-6-0. Advanced scheduler을 위한 변수 초기화
 	t->nice = 0;
 	t->recent_cpu = 0;
+
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

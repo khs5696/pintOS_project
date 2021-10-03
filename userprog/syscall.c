@@ -25,9 +25,6 @@ void syscall_handler (struct intr_frame *);
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
 
-// HS
-static struct lock filesys_lock;
-
 void
 syscall_init (void) {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
@@ -40,8 +37,8 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 	
-	// HS
-	lock_init(&filesys_lock);
+	// HS 2-2-0. system call 관련 변수 초기화
+	lock_init(&file_lock);
 }
 
 
@@ -58,7 +55,7 @@ void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	// HS 2-2-1. syscall_handler 구현
-	memcpy(thread_current()->tf, f, sizeof(struct intr_frame));
+	memcpy(&thread_current()->tf, f, sizeof(struct intr_frame));
 
 	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 해당 시스템 콜(f->R.rax)을 switch문으로 호출
 	// argument가 필요한 시스템 콜의 경우, f->R.rdi가 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
@@ -121,15 +118,23 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	thread_exit();
 }
 
-/* System Call 함수 구현 */
+/* HS 2-2-2. System Call 함수 구현 */
 // pintOS를 종료시킨다.
 void halt(void) {
 	power_off();
 }
 
 void exit (int status) {
-	thread_current()->exit_code = status;
+	thread_current()->exit_status = status;
+	printf ("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
+}
+
+pid_t fork (const char *thread_name) {
+	/* HS 2-3-1. 계층 구조를 위해 fork system call 구현  */
+	// tid_t process_fork (const char *name, struct intr_frame *if_ UNUSED)
+	struct intr_frame * f = &thread_current()->tf;
+	return (pid_t) process_fork (thread_name, f);
 }
 
 bool create (const char *file, unsigned initial_size) {
@@ -146,6 +151,94 @@ bool remove (const char *file) {
 	return result;
 }
 
-int open (const char *file) {
-	
+int read(int fd, void *buffer, unsigned size)
+{
+    int read_result;
+
+    lock_acquire(&filesys_lock);
+    if (fd == 0) {
+        read_result = input_getc();
+    }
+    else {
+        if (process_get_file(fd) != NULL) {
+            read_result = file_read(process_get_file(fd), buffer, size);
+        }
+        else {
+            read_result = -1;
+        }
+    }
+    lock_release(&filesys_lock);
+    return read_result;
+}
+
+int write(int fd, const void *buffer, unsigned size)
+{
+    int write_result;
+    lock_acquire(&filesys_lock);
+    if (fd == 1) {
+        putbuf(buffer, size);
+        write_result = size;
+    }
+    else {
+        if (process_get_file(fd) != NULL) {
+            write_result = file_write(process_get_file(fd), buffer, size);
+        }
+        else{
+            write_result = -1;
+        }
+    }
+    lock_release(&filesys_lock);
+    return write_result;
+}
+
+
+int filesize(int fd) {
+    struct file *open_file = process_get_file(fd);
+    if (open_file){
+        return file_length(open_file);
+    }
+    return -1;
+}
+
+void seek(int fd, unsigned position) {
+    if (process_get_file(fd) != NULL)
+    {
+        file_seek(process_get_file(fd), position);
+    }
+}
+
+void tell(int fd) {
+    if (process_get_file(fd) != NULL) {
+        return file_tell(process_get_file(fd));
+    }
+}
+
+void close(int fd) {
+    process_close_file(fd);
+}
+
+pid_t fork (const char *thread_name){
+    struct intr_frame *user_tf = &thread_current()->fork_tf;
+    pid_t child_pid = (pid_t) process_fork(thread_name, user_tf);
+    sema_down(&get_child_process(child_pid)->load_lock);
+    return child_pid;
+}
+
+int open(const char *file)
+{   
+    int open_result;
+    if (file == NULL){
+        exit(-1);
+    }
+    lock_acquire(&filesys_lock);
+    struct file *new_file = filesys_open(file);
+    if (new_file != NULL) {
+        struct thread *curr = thread_current();
+        open_result = process_add_file(new_file);
+    }
+    else {
+        open_result = -1;
+    }
+    lock_release(&filesys_lock);
+    return open_result;
 }
