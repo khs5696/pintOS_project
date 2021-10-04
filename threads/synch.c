@@ -362,8 +362,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 		// 세마포어의 waiter 내부에서는 sema_up에 의해 정렬이 이미 완료되었으므로
 		// 세마포어의 첫 번째 요소들끼리 비교해 정렬한다.
 		list_sort(&cond->waiters, compare_by_sema_elem_priority, NULL);
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore);
+	sema_up (&list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem)->semaphore);
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by

@@ -127,7 +127,22 @@ struct thread {
 	struct semaphore fork_sema;
 	struct thread * parent_thread;	
 
+	// HS 2-2-2. write 시스템 콜 구현을 위한 변수 선언
+	// 스레드가 가지고 있는 file(open 상태) 구조체에 대한 리스트
+	struct list thread_file_list;
+
+	int fd;
+
 	unsigned magic;                     /* Detects stack overflow. */
+};
+
+// HS 2-2-2. write 시스템 콜 구현을 위한 변수 선언 : file 구조체
+// thread_file_list에 대한 element
+// file과 file descriptor로 구성
+struct file_structure {
+	struct file * file;
+	int file_descriptor;
+	struct list_elem file_elem;
 };
 
 /* If false (default), use round-robin scheduler.

@@ -57,7 +57,7 @@ process_create_initd (const char *file_name) {
 	ptr = strtok_r(file_name, " ", &next_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create (ptr, PRI_DEFAULT, initd, fn_copy);
 
 	if (tid == TID_ERROR)
 		palloc_free_page (fn_copy);
@@ -242,7 +242,7 @@ int process_exec(void *f_name)
     _if.R.rdi = argc;
     _if.R.rsi = (uintptr_t *)_if.rsp + 1;
 
-    hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+    // hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
     /* Start switched process. */
     do_iret(&_if);
@@ -272,14 +272,14 @@ process_wait (tid_t child_tid UNUSED) {
 			break;
 		}
 	}
-	printf("waiting thread : %s\n", t->name);
+	// printf("waiting thread : %s\n", t->name);
 	if(t == NULL) {
 		return -1;
 	}
 	sema_down(&thread_current()->fork_sema);
 	// process_exit() 
 	int result = t->exit_status;
-	printf("waiting exit_status : %d\n", result);
+	// printf("waiting exit_status : %d\n", result);
 	thread_unblock(t);
 
 	return result;
