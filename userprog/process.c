@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "userprog/syscall.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
@@ -305,8 +306,21 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	process_cleanup ();	
+	process_cleanup ();
+
+	/* 공식 문서 System Calls의 'close' 함수 설명
+	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
+	if (!list_empty(&curr->fd_list)) {
+		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
+			struct fd_elem * tmp = list_entry(e, struct fd_elem, elem);
+			lock_acquire(&filesys_lock);
+			file_close(tmp->file_ptr);
+			lock_release(&filesys_lock);
+		}
+	}
 	sema_up(&curr->fork_sema);
+
+
 
 	// enum intr_level old_level;
 	// old_level = intr_disable ();

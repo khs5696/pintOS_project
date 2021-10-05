@@ -115,7 +115,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("tell\n");
 			break;
 		case SYS_CLOSE:
-			printf("close\n");
+			//printf("close\n");
+			close(f->R.rdi);
 			break;
 		default:
 			thread_exit();
@@ -123,17 +124,20 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 }
 
-void halt (void) {
+void
+halt (void) {
 	power_off();
 }
 
-void exit (int status) {
+void
+exit (int status) {
 	thread_current()->exit_status = status;
 	printf ("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
 
-bool create(const char *file, unsigned initial_size) {
+bool
+create(const char *file, unsigned initial_size) {
 	bool result;
 
   if (file == NULL)
@@ -144,7 +148,8 @@ bool create(const char *file, unsigned initial_size) {
 	return result;
 }
 
-int open(const char * file) {
+int
+open(const char * file) {
 	if (file == NULL)
 		exit(-1);
 	lock_acquire(&filesys_lock);
@@ -167,10 +172,8 @@ int open(const char * file) {
 	}
 }
 
-
-
-int write(int fd, const void *buffer, unsigned size)
-{
+int 
+write (int fd, const void *buffer, unsigned size) {
     int write_result = 0;
     lock_acquire(&filesys_lock);
     if (fd == 1) {
@@ -187,6 +190,38 @@ int write(int fd, const void *buffer, unsigned size)
     }
     lock_release(&filesys_lock);
     return write_result;
+}
+
+// JH fd가 너무 많아서 구별해주려고 parameter이름 arg_fd로 한거임....
+// 좋은 이름 추천 받아요
+void
+close (int arg_fd) {
+	struct thread * curr = thread_current();
+	struct list_elem * e;
+	struct fd_elem * close_fd = NULL;
+	bool find_fd = false;
+
+	for (e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
+		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
+		if (arg_fd == tmp_fd->fd) { // closing 할 fd 발견!
+			find_fd = true;
+			close_fd = tmp_fd;
+			break;
+		}
+	}
+	if (find_fd) {
+		// fd_list에서 close 하고자 하는 fd_elem 제거
+		list_remove(e);
+		// 해당 fd에 연결되어 있는 open file close
+		lock_acquire(&filesys_lock);
+		file_close(close_fd->file_ptr);
+		lock_release(&filesys_lock);
+		// malloc()으로 만들어줬던 fd_elem free
+		free(close_fd);
+	} else {
+		exit(-1);
+	}
+	
 }
 
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
