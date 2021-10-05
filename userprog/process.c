@@ -290,7 +290,7 @@ process_wait (tid_t child_tid UNUSED) {
 	// child를 list에서 remove하기
 	// process_exit() 
 	int result = child->exit_status;
-	printf("waiting exit_status : %d\n", result);
+	//printf("waiting exit_status : %d\n", result);
 	// thread_unblock(t);
 
 	return result;

@@ -122,10 +122,18 @@ struct thread {
 	int recent_cpu;
 
 	int exit_status;
+	// 현재 프로세스가 fork한 children의 list
 	struct list child_list;
 	struct list_elem child_elem;
+	// Parent process의 종료시점을 알리기 위한 semaphore
+	// Parent가 Child를 wait하고자 할 때, Parent에서 Child->fork_sema up
+	// Child에서 exit call이 발생했을 때, curr->fork_sema를 down 해줌으로써 parent unblock
 	struct semaphore fork_sema;
+	// 이건 왜 필요하지?
 	struct thread * parent_thread;	
+
+	// File Descriptor
+	struct list fd_list;
 
 	unsigned magic;                     /* Detects stack overflow. */
 };

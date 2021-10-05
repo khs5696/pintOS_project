@@ -11,11 +11,14 @@
 
 #include "include/threads/init.h"
 #include "include/threads/synch.h"
+#include "include/threads/malloc.h"
 #include "include/filesys/filesys.h"
 #include "include/filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -42,6 +45,7 @@ syscall_init (void) {
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
 	lock_init(&filesys_lock);
+	fd_cnt = 3;
 }
 
 
@@ -82,15 +86,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_WAIT:
 			printf("wait\n");
 			break;
-		// case SYS_CREATE:
-		// 	check_address(f->R.rdi);
-		// 	f->R.rax = create(f->R.rdi, f->R.rsi);
-		// 	break;
+		case SYS_CREATE:
+			check_address(f->R.rdi);
+			f->R.rax = create(f->R.rdi, f->R.rsi);
+			break;
 		case SYS_REMOVE:
 			printf("remove\n");
 			break;
 		case SYS_OPEN:
-			printf("open\n");
+			//printf("open\n");
+			check_address(f->R.rdi);
+      f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
 			printf("filesize\n");
@@ -127,15 +133,41 @@ void exit (int status) {
 	thread_exit();
 }
 
-// bool create(const char *file, unsigned initial_size) {
-// 	bool result;
+bool create(const char *file, unsigned initial_size) {
+	bool result;
 
-//   if (file == NULL)
-//     exit(-1);
-	
-// 	result = filesys_create(file, initial_size);
-// 	return result;
-// }
+  if (file == NULL)
+    exit(-1);
+	lock_acquire(&filesys_lock);
+	result = filesys_create(file, initial_size);
+	lock_release(&filesys_lock);
+	return result;
+}
+
+int open(const char * file) {
+	if (file == NULL)
+		exit(-1);
+	lock_acquire(&filesys_lock);
+	struct file * open_file = filesys_open(file);
+	lock_release(&filesys_lock);
+
+	if (open_file == NULL) { // file open error
+		return -1;
+	} else { // file open complete!
+		struct thread * curr = thread_current();
+		struct fd_elem * new_fd = malloc(sizeof(struct fd_elem));
+		
+		// fd를 정하는 과정 - 일단은 fd 계속 증가
+		new_fd->fd = fd_cnt;
+		fd_cnt++;
+		new_fd->file_ptr = open_file;
+
+		list_insert_ordered(&curr->fd_list, &new_fd->elem, compare_by_fd, NULL);
+		return new_fd->fd;
+	}
+}
+
+
 
 int write(int fd, const void *buffer, unsigned size)
 {
@@ -155,4 +187,10 @@ int write(int fd, const void *buffer, unsigned size)
     }
     lock_release(&filesys_lock);
     return write_result;
+}
+
+static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+	int fd_a = list_entry(a, struct fd_elem, elem)->fd;
+	int fd_b = list_entry(b, struct fd_elem, elem)->fd;
+	return (fd_a < fd_b);
 }
