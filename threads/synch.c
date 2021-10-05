@@ -220,7 +220,7 @@ lock_acquire (struct lock *lock) {
 		thread_current()->waiting_lock = lock;				// 실행 중인 스레드의 waiting_lock 업데이트
 		list_insert_ordered(&lock->holder->donated, 		// holder의 donated에 우선순위에 따라 삽입
 			&thread_current()->donated_elem, 
-				compare_donate_priority, 0);
+			compare_donate_priority, 0);
 
 		donation();
 	}
@@ -362,7 +362,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 		// 세마포어의 waiter 내부에서는 sema_up에 의해 정렬이 이미 완료되었으므로
 		// 세마포어의 첫 번째 요소들끼리 비교해 정렬한다.
 		list_sort(&cond->waiters, compare_by_sema_elem_priority, NULL);
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
+	sema_up (&list_entry (list_pop_front (&cond->waiters),
 					struct semaphore_elem, elem)->semaphore);
 }
 

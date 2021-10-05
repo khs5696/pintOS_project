@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <string.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -8,8 +9,10 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
-#include "include/filesys/file.h"
+#include "include/threads/init.h"
 #include "include/threads/synch.h"
+#include "include/filesys/filesys.h"
+#include "include/filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -45,16 +48,16 @@ syscall_init (void) {
 // argument로 주어진 포인터가 유저 메모리 영역(0 ~ KERN_BASE)인지 확인
 // 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
 void check_address (void * addr) {
-	if ((uint64_t)addr >= 0x8004000000) {
-		printf("address is not valid\n");
+	if (!is_user_vaddr(addr)) {
+		exit(-1);
+		//printf("address is not valid\n");
 	}
-	printf("address is valid\n");
 }
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	printf("system call\n");
+	//printf("system call\n");
 
 	// TODO: Your implementation goes here.
 	// HS 2-2-1. syscall_handler 구현
@@ -67,7 +70,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("halt\n");
 			break;
 		case SYS_EXIT:
-			printf("exit\n");
+			//printf("exit\n");
 			exit(f->R.rdi);
 			break;
 		case SYS_FORK:
@@ -79,9 +82,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_WAIT:
 			printf("wait\n");
 			break;
-		case SYS_CREATE:
-			printf("create\n");
-			break;
+		// case SYS_CREATE:
+		// 	check_address(f->R.rdi);
+		// 	f->R.rax = create(f->R.rdi, f->R.rsi);
+		// 	break;
 		case SYS_REMOVE:
 			printf("remove\n");
 			break;
@@ -95,7 +99,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("read\n");
 			break;
 		case SYS_WRITE:
-			printf("write\n");
 			check_address(f->R.rsi);
 			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
@@ -114,24 +117,35 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	}
 }
 
+void halt (void) {
+	power_off();
+}
+
 void exit (int status) {
 	thread_current()->exit_status = status;
 	printf ("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
 
+// bool create(const char *file, unsigned initial_size) {
+// 	bool result;
+
+//   if (file == NULL)
+//     exit(-1);
+	
+// 	result = filesys_create(file, initial_size);
+// 	return result;
+// }
+
 int write(int fd, const void *buffer, unsigned size)
 {
     int write_result = 0;
     lock_acquire(&filesys_lock);
     if (fd == 1) {
-		printf("fd writing\n");
         putbuf(buffer, size);
-		printf("buffer is printed\n");
         write_result = size;
     }
     else {
-		printf("not fd writing\n");
         // if (process_get_file(fd) != NULL) {
            // write_result = file_write(process_get_file(fd), buffer, size);
         // }
