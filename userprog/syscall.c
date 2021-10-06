@@ -9,11 +9,12 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
-#include "include/threads/init.h"
-#include "include/threads/synch.h"
-#include "include/threads/malloc.h"
-#include "include/filesys/filesys.h"
-#include "include/filesys/file.h"
+#include "devices/input.h"
+#include "threads/init.h"
+#include "threads/synch.h"
+#include "threads/malloc.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -50,12 +51,11 @@ syscall_init (void) {
 
 
 // argument로 주어진 포인터가 유저 메모리 영역(0 ~ KERN_BASE)인지 확인
+// JH 또 user가 전달한 pointer가 mapping 되지 않았을 수도 있음으로 이것도 체크
 // 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
 void check_address (void * addr) {
-	if (!is_user_vaddr(addr)) {
+	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))
 		exit(-1);
-		//printf("address is not valid\n");
-	}
 }
 
 /* The main system call interface */
@@ -71,10 +71,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// argument가 필요한 시스템 콜의 경우, f->R.rdi가 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
 	switch (f->R.rax) {
 		case SYS_HALT:
-			printf("halt\n");
+			halt();
 			break;
 		case SYS_EXIT:
-			//printf("exit\n");
 			exit(f->R.rdi);
 			break;
 		case SYS_FORK:
@@ -94,15 +93,15 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("remove\n");
 			break;
 		case SYS_OPEN:
-			//printf("open\n");
 			check_address(f->R.rdi);
       f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
-			printf("filesize\n");
+			f->R.rax = filesize(f->R.rdi);
 			break;
 		case SYS_READ:
-			printf("read\n");
+			check_address(f->R.rsi);
+			f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_WRITE:
 			check_address(f->R.rsi);
@@ -115,7 +114,6 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("tell\n");
 			break;
 		case SYS_CLOSE:
-			//printf("close\n");
 			close(f->R.rdi);
 			break;
 		default:
@@ -172,6 +170,48 @@ open(const char * file) {
 	}
 }
 
+int
+filesize (int fd) {
+	for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
+		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
+		if (fd == tmp_fd->fd) { // read 할 fd 발견!
+			//Warning : 그냥 read, write 개념이 아니라 값을 찾는거라 lock 안 걸었는데 문제가 되려나...?
+			return file_length(tmp_fd->file_ptr);
+		}
+	}
+	exit(-1);
+}
+
+int
+read (int fd, const void *buffer, unsigned size) {
+	int actually_read_byte = 0;
+	
+	if (fd == 0) { // STDIN
+		lock_acquire(&filesys_lock);
+		actually_read_byte = input_getc();
+		lock_release(&filesys_lock);
+		return actually_read_byte;
+	} else if (fd >= 3) {
+		struct thread * curr = thread_current();
+
+		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
+			struct fd_elem * read_fd = list_entry(e, struct fd_elem, elem);
+			if (fd == read_fd->fd) { // read 할 fd 발견!
+				lock_acquire(&filesys_lock);
+				actually_read_byte = file_read(read_fd->file_ptr, buffer, size);
+				lock_release(&filesys_lock);
+				return actually_read_byte;
+			}
+		}
+		// idea : for-loop을 돌면서 발견했다면 이미 return 했을 것
+		// idea : 여기 코드가 실행될 때는 원하는 fd를 발견하지 못한 것
+		exit(-1);
+		NOT_REACHED();
+	} else {
+		exit(-1);
+	}
+}
+
 int 
 write (int fd, const void *buffer, unsigned size) {
     int write_result = 0;
@@ -211,6 +251,7 @@ close (int arg_fd) {
 	}
 	if (find_fd) {
 		// fd_list에서 close 하고자 하는 fd_elem 제거
+		// 얘 때문에 위에 e 선언 for-loop 안으로 제한하면 안됨
 		list_remove(e);
 		// 해당 fd에 연결되어 있는 open file close
 		lock_acquire(&filesys_lock);
