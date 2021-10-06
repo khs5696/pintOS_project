@@ -220,7 +220,7 @@ lock_acquire (struct lock *lock) {
 		thread_current()->waiting_lock = lock;				// 실행 중인 스레드의 waiting_lock 업데이트
 		list_insert_ordered(&lock->holder->donated, 		// holder의 donated에 우선순위에 따라 삽입
 			&thread_current()->donated_elem, 
-				compare_donate_priority, 0);
+			compare_donate_priority, 0);
 
 		donation();
 	}
