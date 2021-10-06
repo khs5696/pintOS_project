@@ -19,6 +19,7 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+static struct file * find_file_by_fd (int fd);
 
 /* System call.
  *
@@ -172,14 +173,19 @@ open(const char * file) {
 
 int
 filesize (int fd) {
-	for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
-		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
-		if (fd == tmp_fd->fd) { // read 할 fd 발견!
-			//Warning : 그냥 read, write 개념이 아니라 값을 찾는거라 lock 안 걸었는데 문제가 되려나...?
-			return file_length(tmp_fd->file_ptr);
-		}
-	}
-	exit(-1);
+	struct file * size_check_file_ptr = find_file_by_fd(fd);
+	if (size_check_file_ptr != NULL)
+		return file_length(size_check_file_ptr);
+	else
+		exit(-1);
+	// for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
+	// 	struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
+	// 	if (fd == tmp_fd->fd) { // read 할 fd 발견!
+	// 		//Warning : 그냥 read, write 개념이 아니라 값을 찾는거라 lock 안 걸었는데 문제가 되려나...?
+	// 		return file_length(tmp_fd->file_ptr);
+	// 	}
+	// }
+	// exit(-1);
 }
 
 int
@@ -192,21 +198,14 @@ read (int fd, const void *buffer, unsigned size) {
 		lock_release(&filesys_lock);
 		return actually_read_byte;
 	} else if (fd >= 3) {
-		struct thread * curr = thread_current();
-
-		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
-			struct fd_elem * read_fd = list_entry(e, struct fd_elem, elem);
-			if (fd == read_fd->fd) { // read 할 fd 발견!
-				lock_acquire(&filesys_lock);
-				actually_read_byte = file_read(read_fd->file_ptr, buffer, size);
-				lock_release(&filesys_lock);
-				return actually_read_byte;
-			}
-		}
-		// idea : for-loop을 돌면서 발견했다면 이미 return 했을 것
-		// idea : 여기 코드가 실행될 때는 원하는 fd를 발견하지 못한 것
-		exit(-1);
-		NOT_REACHED();
+		struct file * read_file = find_file_by_fd(fd);
+		if (read_file != NULL) {
+			lock_acquire(&filesys_lock);
+			actually_read_byte = file_read(read_file, buffer, size);
+			lock_release(&filesys_lock);
+			return actually_read_byte;
+		} else
+			exit(-1);
 	} else {
 		exit(-1);
 	}
@@ -214,22 +213,26 @@ read (int fd, const void *buffer, unsigned size) {
 
 int 
 write (int fd, const void *buffer, unsigned size) {
-    int write_result = 0;
-    lock_acquire(&filesys_lock);
-    if (fd == 1) {
-        putbuf(buffer, size);
-        write_result = size;
-    }
-    else {
-        // if (process_get_file(fd) != NULL) {
-           // write_result = file_write(process_get_file(fd), buffer, size);
-        // }
-        // else{
-//            write_result = -1;
-//        }
-    }
-    lock_release(&filesys_lock);
-    return write_result;
+	if (fd == 1) {
+			lock_acquire(&filesys_lock);
+			putbuf(buffer, size);
+			lock_release(&filesys_lock);
+			return size;
+	} else if (fd >= 3) {
+		struct file * write_file = find_file_by_fd(fd);
+		if (write_file != NULL) {
+			int actually_write_byte;
+			lock_acquire(&filesys_lock);
+			actually_write_byte = file_write(write_file, buffer, size);
+			lock_release(&filesys_lock);
+			return actually_write_byte;
+		} else {  // can't find open file "fd"
+			exit(-1);
+		}
+	} else {
+		exit(-1);
+	}
+	NOT_REACHED();
 }
 
 // JH fd가 너무 많아서 구별해주려고 parameter이름 arg_fd로 한거임....
@@ -269,4 +272,18 @@ static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, 
 	int fd_a = list_entry(a, struct fd_elem, elem)->fd;
 	int fd_b = list_entry(b, struct fd_elem, elem)->fd;
 	return (fd_a < fd_b);
+}
+
+// "fd"에 해당하는 open file이 있을 경우 해당 file pointer를 리턴
+// 찾지 못했을 경우 NULL을 리턴
+static struct file *
+find_file_by_fd (int fd) {
+	for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
+		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
+		if (fd == tmp_fd->fd) { 
+			return tmp_fd->file_ptr;
+		}
+	}
+	return NULL;
+
 }
