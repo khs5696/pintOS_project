@@ -15,14 +15,3 @@ Putting 'sample.txt' into the file system...
 Executing 'fork-read':
 (fork-read) begin
 (fork-read) open "sample.txt"
-fork-read: exit(-1)
-Execution of 'fork-read' complete.
-Timer: 64 ticks
-Thread: 35 idle ticks, 28 kernel ticks, 1 user ticks
-hd0:0: 0 reads, 0 writes
-hd0:1: 115 reads, 260 writes
-hd1:0: 111 reads, 0 writes
-Console: 916 characters output
-Keyboard: 0 keys pressed
-Exception: 1 page faults
-Powering off...

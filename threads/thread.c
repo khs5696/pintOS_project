@@ -290,14 +290,12 @@ thread_name (void) {
 struct thread *
 thread_current (void) {
 	struct thread *t = running_thread ();
-	if (t == NULL) {
-		printf("thread is null\n");
-	}
+
 	/* Make sure T is really a thread.
-	   If either of these assertions fire, then your thread may
-	   have overflowed its stack.  Each thread has less than 4 kB
-	   of stack, so a few big automatic arrays or moderate
-	   recursion can cause stack overflow. */
+		If either of these assertions fire, then your thread may
+		have overflowed its stack.  Each thread has less than 4 kB
+		of stack, so a few big automatic arrays or moderate
+		recursion can cause stack overflow. */
 	ASSERT (is_thread (t));
 	ASSERT (t->status == THREAD_RUNNING);
 
@@ -499,11 +497,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->nice = 0;
 	t->recent_cpu = 0;
 
+#ifdef USERPROG
 	list_init(&t->child_list);
-	list_init(&t->thread_file_list);
 	sema_init(&t->fork_sema, 0);
-
-	t->fd = 2;
+	sema_init(&t->load_sema, 0);
+	list_init(&t->fd_list);
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

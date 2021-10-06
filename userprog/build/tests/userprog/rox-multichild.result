@@ -1,80 +1,13 @@
 FAIL
-Test output failed to match any acceptable form.
-
-Acceptable output:
-  (rox-multichild) begin
-  (rox-multichild) open "child-rox"
-  (rox-multichild) read "child-rox"
-  (rox-multichild) write "child-rox"
-  (rox-multichild) exec "child-rox 5"
-  (child-rox) begin
-  (child-rox) try to write "child-rox"
-  (child-rox) exec "child-rox 4"
-  (child-rox) begin
-  (child-rox) try to write "child-rox"
-  (child-rox) exec "child-rox 3"
-  (child-rox) begin
-  (child-rox) try to write "child-rox"
-  (child-rox) exec "child-rox 2"
-  (child-rox) begin
-  (child-rox) try to write "child-rox"
-  (child-rox) exec "child-rox 1"
-  (child-rox) begin
-  (child-rox) try to write "child-rox"
-  (child-rox) try to write "child-rox"
-  (child-rox) end
-  child-rox: exit(12)
-  (child-rox) try to write "child-rox"
-  (child-rox) end
-  child-rox: exit(12)
-  (child-rox) try to write "child-rox"
-  (child-rox) end
-  child-rox: exit(12)
-  (child-rox) try to write "child-rox"
-  (child-rox) end
-  child-rox: exit(12)
-  (child-rox) try to write "child-rox"
-  (child-rox) end
-  child-rox: exit(12)
-  (rox-multichild) write "child-rox"
-  (rox-multichild) end
-  rox-multichild: exit(0)
-Differences in `diff -u' format:
-  (rox-multichild) begin
-  (rox-multichild) open "child-rox"
-- (rox-multichild) read "child-rox"
-- (rox-multichild) write "child-rox"
-- (rox-multichild) exec "child-rox 5"
-- (child-rox) begin
-- (child-rox) try to write "child-rox"
-- (child-rox) exec "child-rox 4"
-- (child-rox) begin
-- (child-rox) try to write "child-rox"
-- (child-rox) exec "child-rox 3"
-- (child-rox) begin
-- (child-rox) try to write "child-rox"
-- (child-rox) exec "child-rox 2"
-- (child-rox) begin
-- (child-rox) try to write "child-rox"
-- (child-rox) exec "child-rox 1"
-- (child-rox) begin
-- (child-rox) try to write "child-rox"
-- (child-rox) try to write "child-rox"
-- (child-rox) end
-- child-rox: exit(12)
-- (child-rox) try to write "child-rox"
-- (child-rox) end
-- child-rox: exit(12)
-- (child-rox) try to write "child-rox"
-- (child-rox) end
-- child-rox: exit(12)
-- (child-rox) try to write "child-rox"
-- (child-rox) end
-- child-rox: exit(12)
-- (child-rox) try to write "child-rox"
-- (child-rox) end
-- child-rox: exit(12)
-- (rox-multichild) write "child-rox"
-- (rox-multichild) end
-- rox-multichild: exit(0)
-+ rox-multichild: exit(-1)
+Kernel panic in run: PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
+Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2
+Translation of call stack:
+0x000000800421883d: debug_panic (lib/kernel/debug.c:32)
+0x000000800420d784: pml4_get_page (threads/mmu.c:217)
+0x000000800421c050: duplicate_pte (userprog/process.c:119)
+0x000000800420d20e: pt_for_each (threads/mmu.c:113)
+0x000000800420d2c0: pgdir_for_each (threads/mmu.c:126)
+0x000000800420d365: pdp_for_each (threads/mmu.c:139)
+0x000000800420d3fd: pml4_for_each (threads/mmu.c:152)
+0x000000800421c12b: __do_fork (userprog/process.c:164)
+0x00000080042076a2: kernel_thread (threads/thread.c:472)

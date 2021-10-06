@@ -15,14 +15,20 @@ Executing 'lg-full':
 (lg-full) begin
 (lg-full) create "quux"
 (lg-full) open "quux"
-lg-full: exit(-1)
+(lg-full) writing "quux"
+(lg-full) close "quux"
+(lg-full) open "quux" for verification
+(lg-full) verified contents of "quux"
+(lg-full) close "quux"
+(lg-full) end
+lg-full: exit(0)
 Execution of 'lg-full' complete.
-Timer: 70 ticks
-Thread: 39 idle ticks, 27 kernel ticks, 4 user ticks
+Timer: 77 ticks
+Thread: 38 idle ticks, 31 kernel ticks, 8 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 106 reads, 400 writes
+hd0:1: 259 reads, 548 writes
 hd1:0: 106 reads, 0 writes
-Console: 858 characters output
+Console: 1019 characters output
 Keyboard: 0 keys pressed
-Exception: 1 page faults
+Exception: 0 page faults
 Powering off...

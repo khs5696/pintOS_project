@@ -95,7 +95,7 @@ pml4e_walk (uint64_t *pml4e, const uint64_t va, int create) {
 uint64_t *
 pml4_create (void) {
 	uint64_t *pml4 = palloc_get_page (0);
-	if (pml4)
+	if (pml4) 
 		memcpy (pml4, base_pml4, PGSIZE);
 	return pml4;
 }
@@ -147,7 +147,9 @@ pdp_for_each (uint64_t *pdp,
 bool
 pml4_for_each (uint64_t *pml4, pte_for_each_func *func, void *aux) {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {
+		// HS 400. 물리적 주소인 pml4[i]에 해당하는 kernel virtual address
 		uint64_t *pdpe = ptov((uint64_t *) pml4[i]);
+		// PTE_P는 0x1 -> pdpe가 존재하면 true
 		if (((uint64_t) pdpe) & PTE_P)
 			if (!pdp_for_each ((uint64_t *) PTE_ADDR (pdpe), func, aux, i))
 				return false;

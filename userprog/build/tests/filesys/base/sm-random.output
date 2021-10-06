@@ -15,14 +15,141 @@ Executing 'sm-random':
 (sm-random) begin
 (sm-random) create "bazzle"
 (sm-random) open "bazzle"
-sm-random: exit(-1)
+(sm-random) write "bazzle" in random order
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+seek
+(sm-random) read "bazzle" in random order
+seek
+(sm-random) read 13 bytes at offset 780 failed: FAILED
+sm-random: exit(1)
 Execution of 'sm-random' complete.
-Timer: 66 ticks
-Thread: 32 idle ticks, 30 kernel ticks, 4 user ticks
+Timer: 89 ticks
+Thread: 41 idle ticks, 27 kernel ticks, 21 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 109 reads, 264 writes
+hd0:1: 235 reads, 390 writes
 hd1:0: 110 reads, 0 writes
-Console: 880 characters output
+Console: 1640 characters output
 Keyboard: 0 keys pressed
-Exception: 1 page faults
+Exception: 0 page faults
 Powering off...

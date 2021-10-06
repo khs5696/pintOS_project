@@ -1,18 +1,1 @@
-FAIL
-Kernel panic in run: PANIC at ../../threads/thread.c:301 in thread_current(): assertion `is_thread (t)' failed.
-Call stack: 0x800421884a 0x8004207223 0x800420b00d 0x800420aeec 0x800420be93 0x800420bf5b 0x800420c501 0x800421fe11 0x800421edf8 0x800421cc05 0x800421c8d2 0x800421c1d0 0x800421beaa 0x80042076bf
-Translation of call stack:
-0x000000800421884a: debug_panic (lib/kernel/debug.c:32)
-0x0000008004207223: thread_current (threads/thread.c:302)
-0x000000800420b00d: lock_held_by_current_thread (threads/synch.c:287)
-0x000000800420aeec: lock_release (threads/synch.c:261)
-0x000000800420be93: palloc_get_multiple (threads/palloc.c:271 (discriminator 4))
-0x000000800420bf5b: palloc_get_page (threads/palloc.c:297)
-0x000000800420c501: malloc (threads/malloc.c:122)
-0x000000800421fe11: inode_read_at (filesys/inode.c:210)
-0x000000800421edf8: file_read (filesys/file.c:74)
-0x000000800421cc05: load_segment (userprog/process.c:600)
-0x000000800421c8d2: load (userprog/process.c:484)
-0x000000800421c1d0: process_exec (userprog/process.c:207)
-0x000000800421beaa: initd (userprog/process.c:77)
-0x00000080042076bf: kernel_thread (threads/thread.c:474)
+PASS

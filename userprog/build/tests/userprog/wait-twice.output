@@ -4,7 +4,7 @@ Kernel command line: -q -f put wait-twice put child-simple run wait-twice
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  157,081,600 loops/s.
+Calibrating timer...  104,755,200 loops/s.
 hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 204 sector (102 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -14,20 +14,15 @@ Putting 'wait-twice' into the file system...
 Putting 'child-simple' into the file system...
 Executing 'wait-twice':
 (wait-twice) begin
-fork
-wait
-(wait-twice) wait(exec()) = 4
-wait
-(wait-twice) wait(exec()) = 4
-(wait-twice) end
-wait-twice: exit(0)
-Execution of 'wait-twice' complete.
+Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
+Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
 Timer: 71 ticks
-Thread: 38 idle ticks, 31 kernel ticks, 2 user ticks
+Thread: 40 idle ticks, 29 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 107 reads, 446 writes
 hd1:0: 204 reads, 0 writes
-Console: 989 characters output
-Keyboard: 0 keys pressed
-Exception: 0 page faults
-Powering off...
+Console: 1227 characters output
+Key

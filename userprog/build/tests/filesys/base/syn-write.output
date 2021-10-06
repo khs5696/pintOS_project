@@ -15,37 +15,15 @@ Putting 'child-syn-wrt' into the file system...
 Executing 'syn-write':
 (syn-write) begin
 (syn-write) create "stuff"
-fork
-(syn-write) exec child 1 of 10: "child-syn-wrt 0"
-fork
-(syn-write) exec child 2 of 10: "child-syn-wrt 1"
-fork
-(syn-write) exec child 3 of 10: "child-syn-wrt 2"
-fork
-(syn-write) exec child 4 of 10: "child-syn-wrt 3"
-fork
-(syn-write) exec child 5 of 10: "child-syn-wrt 4"
-fork
-(syn-write) exec child 6 of 10: "child-syn-wrt 5"
-fork
-(syn-write) exec child 7 of 10: "child-syn-wrt 6"
-fork
-(syn-write) exec child 8 of 10: "child-syn-wrt 7"
-fork
-(syn-write) exec child 9 of 10: "child-syn-wrt 8"
-fork
-(syn-write) exec child 10 of 10: "child-syn-wrt 9"
-wait
-(syn-write) wait for child 1 of 10 returned 4 (expected 0)
-(syn-write) wait for child 1 of 10 returned 4 (expected 0): FAILED
-syn-write: exit(1)
-Execution of 'syn-write' complete.
-Timer: 75 ticks
-Thread: 38 idle ticks, 32 kernel ticks, 6 user ticks
+Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
+Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 70 ticks
+Thread: 36 idle ticks, 32 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 132 reads, 512 writes
 hd1:0: 226 reads, 0 writes
-Console: 1601 characters output
-Keyboard: 0 keys pressed
-Exception: 0 page faults
-Powering off...
+Console: 1251 characters output
+Key

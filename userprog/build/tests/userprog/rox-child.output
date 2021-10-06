@@ -15,14 +15,19 @@ Putting 'child-rox' into the file system...
 Executing 'rox-child':
 (rox-child) begin
 (rox-child) open "child-rox"
-rox-child: exit(-1)
-Execution of 'rox-child' complete.
-Timer: 72 ticks
-Thread: 34 idle ticks, 36 kernel ticks, 2 user ticks
+(rox-child) read "child-rox"
+seek
+(rox-child) write "child-rox"
+(rox-child) exec "child-rox 1"
+Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
+Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 71 ticks
+Thread: 33 idle ticks, 35 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 112 reads, 478 writes
+hd0:1: 114 reads, 479 writes
 hd1:0: 220 reads, 0 writes
-Console: 914 characters output
-Keyboard: 0 keys pressed
-Exception: 1 page faults
-Powering off...
+Console: 1340 characters output
+Key

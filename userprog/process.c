@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "userprog/syscall.h"
 #include "userprog/gdt.h"
 #include "userprog/tss.h"
 #include "filesys/directory.h"
@@ -41,6 +42,7 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
+	char *cmd_name;
 	tid_t tid;
 
 	char * ptr;
@@ -51,16 +53,24 @@ process_create_initd (const char *file_name) {
 	fn_copy = palloc_get_page (0);
 	if (fn_copy == NULL)
 		return TID_ERROR;
-	strlcpy (fn_copy, file_name, PGSIZE);
+	strlcpy (fn_copy, file_name, strlen(file_name)+1);
+
+	cmd_name = palloc_get_page (0);
+	if (cmd_name == NULL)
+		return TID_ERROR;
+	strlcpy (cmd_name, file_name, strlen(file_name)+1);
 
 	// HS 2-1-3. filename 토큰화
-	ptr = strtok_r(file_name, " ", &next_ptr);
-
+	ptr = strtok_r(cmd_name, " ", &next_ptr);
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (ptr, PRI_DEFAULT, initd, fn_copy);
 
-	if (tid == TID_ERROR)
+	if (tid == TID_ERROR) {
 		palloc_free_page (fn_copy);
+		palloc_free_page (cmd_name);
+		return TID_ERROR;
+	}
+		
 
 	return tid;
 }
@@ -81,11 +91,15 @@ initd (void *f_name) {
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
-tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+tid_t process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());	
+	
+	if (list_empty(&thread_current()->child_list)) {
+		return 0;		// child process
+	} else {
+		return tid;		// parent process
+	}
 }
 
 #ifndef VM
@@ -100,21 +114,29 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va)) {
+		return false;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, sizeof(PGSIZE));
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -159,6 +181,9 @@ __do_fork (void *aux) {
 
 	process_init ();
 
+	// HS 300
+	sema_up(&current->load_sema);
+
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
@@ -167,60 +192,61 @@ error:
 }
 
 
-int process_exec(void *f_name)
-{
-    char *file_name = f_name;
-    bool success;
+int
+process_exec(void *f_name) {
+	char *file_name = f_name;
+	bool success;
 
 	/* HS 2-1-0. Command Line Parsing을 위한 변수 선언 */
 	// Command Parsing 관련 변수
-    char *parsing_token;
+  char *parsing_token;
 	char *next_token;
 
 	// Stack Organization 관련 변수
-    int argc = 0; 
+  int argc = 0; 
 	int command_len = 0;			// alignment를 위해 token들이 stack에서 차지하는 byte
-    char *argv[128];
-	char *command_address[128];		// stack에서의 각 token 주소(포인터)를 저장할 배열
+  char *argv[50];
+	char *command_address[50];		// stack에서의 각 token 주소(포인터)를 저장할 배열
 
 	/* HS 2-1-1. Command Parsing */
-    parsing_token = strtok_r(f_name, " ", &next_token);
-    argv[argc] = parsing_token;
+	/*Warning: cannot use f_name anymore since strtok_r is used to f_name*/
+	parsing_token = strtok_r(f_name, " ", &next_token);
+	argv[argc] = parsing_token;
 
-    while (parsing_token) {
-        argc = argc + 1;
-        parsing_token = strtok_r(NULL, " ", &next_token);
-        argv[argc] = parsing_token;
-    }
+	while (parsing_token) {
+		argc = argc + 1;
+		parsing_token = strtok_r(NULL, " ", &next_token);
+		argv[argc] = parsing_token;
+	}
 
-    /* We cannot use the intr_frame in the thread structure.
-    * This is because when current thread rescheduled,
-    * it stores the execution information to the member. */
-    struct intr_frame _if;
-    _if.ds = _if.es = _if.ss = SEL_UDSEG;
-    _if.cs = SEL_UCSEG;
-    _if.eflags = FLAG_IF | FLAG_MBS;
+	/* We cannot use the intr_frame in the thread structure.
+	* This is because when current thread rescheduled,
+	* it stores the execution information to the member. */
+	struct intr_frame _if;
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;
+	_if.cs = SEL_UCSEG;
+	_if.eflags = FLAG_IF | FLAG_MBS;
 
-    /* We first kill the current context */
-    process_cleanup();
-    /* And then load the binary */
-    success = load(argv[0], &_if);
-    /* If load failed, quit. */
-
-    if (!success)
-        return -1;    
-
+	/* We first kill the current context */
+	process_cleanup();
+	
+	/* And then load the binary */
+	success = load(argv[0], &_if);
+	/* If load failed, quit. */
+	
+	if (!success)
+		return -1;
+	
 	/* HS 2-1-2. Stack Organization */
 	// argv에 저장된 token을 순서대로 stack에 삽입
 	int length = 0;
 	for (int i = argc - 1; i > -1; i--) {
-		length = strlen(argv[i]) + 1;				// '\0'도 포함
+		length = strlen(argv[i]) + 1;				// '\0'도 포함 
 		command_len += length;						// alignment를 위해 command_len 업데이트
 		_if.rsp = (char *)_if.rsp - length;		// token의 크기만큼 rsp(stack pointer) 이동
 		memcpy (_if.rsp, argv[i], length);			// rsp에 token을 복사
 		command_address[i] = (char *) _if.rsp;	// 각 token의 주소를 배열에 저장
 	}
-
 	// Alignment를 위해 padding 영역만큼 rsp 이동
 	if ((command_len % sizeof(uintptr_t)) != 0) {	
 		int align_padding = sizeof(uintptr_t) - (command_len % sizeof(uintptr_t));
@@ -239,15 +265,15 @@ int process_exec(void *f_name)
 	_if.rsp = (char *)_if.rsp - sizeof(uintptr_t *);
 	*(uint64_t *)_if.rsp = 0;
 
-    _if.R.rdi = argc;
-    _if.R.rsi = (uintptr_t *)_if.rsp + 1;
+	_if.R.rdi = argc;
+	_if.R.rsi = (uintptr_t *)_if.rsp + 1;
 
-    // hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	//hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
-    /* Start switched process. */
-    do_iret(&_if);
-    palloc_free_page(file_name); 
-    NOT_REACHED();
+	/* Start switched process. */
+	do_iret(&_if);
+	palloc_free_page(file_name); 
+	NOT_REACHED();
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -264,25 +290,17 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	struct thread * t = NULL;
+	struct thread * child = NULL;
 
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-		t = list_entry(e, struct thread, child_elem);
-		if (t->tid == child_tid) {
-			break;
+		child = list_entry(e, struct thread, child_elem);
+		if (child->tid == child_tid) {
+			sema_down(&child->fork_sema);
+			int result = child->exit_status;
+			return result;
 		}
 	}
-	// printf("waiting thread : %s\n", t->name);
-	if(t == NULL) {
-		return -1;
-	}
-	sema_down(&thread_current()->fork_sema);
-	// process_exit() 
-	int result = t->exit_status;
-	// printf("waiting exit_status : %d\n", result);
-	thread_unblock(t);
-
-	return result;
+	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -295,12 +313,25 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	process_cleanup ();
-	sema_up(&curr->parent_thread->fork_sema);
 
-	enum intr_level old_level;
-	old_level = intr_disable ();
-	thread_block();
-	intr_set_level (old_level);
+	/* 공식 문서 System Calls의 'close' 함수 설명
+	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
+	if (!list_empty(&curr->fd_list)) {
+		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
+			struct fd_elem * tmp = list_entry(e, struct fd_elem, elem);
+			lock_acquire(&filesys_lock);
+			file_close(tmp->file_ptr);
+			lock_release(&filesys_lock);
+		}
+	}
+	sema_up(&curr->fork_sema);
+
+
+
+	// enum intr_level old_level;
+	// old_level = intr_disable ();
+	// thread_block();
+	// intr_set_level (old_level);
 }
 
 /* Free the current process's resources. */
