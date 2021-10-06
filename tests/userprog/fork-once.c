@@ -9,7 +9,8 @@ test_main (void)
 {
   int pid;
 
-  if ((pid = fork("child"))){
+  if ((pid = fork("sibal"))){
+    // msg("fork finish\n");
     int status = wait (pid);
     msg ("Parent: child exit status is %d", status);
   } else {

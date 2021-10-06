@@ -16,15 +16,3 @@ Putting 'child-close' into the file system...
 Executing 'multi-child-fd':
 (multi-child-fd) begin
 (multi-child-fd) open "sample.txt"
-Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
-Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
-The `backtrace' program can make call stacks useful.
-Read "Backtraces" in the "Debugging Tools" chapter
-of the Pintos documentation for more information.
-Timer: 82 ticks
-Thread: 36 idle ticks, 41 kernel ticks, 5 user ticks
-hd0:0: 0 reads, 0 writes
-hd0:1: 148 reads, 488 writes
-hd1:0: 220 reads, 0 writes
-Console: 1340 characters output
-Key

@@ -93,11 +93,15 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current ());	
-	
+	// HS 999
+	memcpy(&thread_current()->tf, if_, sizeof(struct intr_frame));
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current());	
+
 	if (list_empty(&thread_current()->child_list)) {
+		//msg("return child PID\n");
 		return 0;		// child process
 	} else {
+		//msg("return parent PID\n");
 		return tid;		// parent process
 	}
 }
@@ -115,7 +119,8 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
 	if (is_kernel_vaddr(va)) {
-		return false;
+		//msg("parent is kernel\n");
+		return true;
 	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
@@ -128,7 +133,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-	memcpy(newpage, parent_page, sizeof(PGSIZE));
+	memcpy(newpage, parent_page, sizeof(PAL_USER));
 	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
@@ -153,8 +158,11 @@ __do_fork (void *aux) {
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
+	memcpy(parent_if, &parent->tf, sizeof(struct intr_frame));
+	// HS 999. memcpy 부분을 지금 넘어가지 못하고 있음.
 	bool succ = true;
-
+	
+	//printf("aux tid : %d\n", parent->tid);
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -169,8 +177,10 @@ __do_fork (void *aux) {
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
 		goto error;
 #else
-	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
+		//printf("do_fork error\n");
 		goto error;
+	}
 #endif
 
 	/* TODO: Your code goes here.
@@ -180,14 +190,16 @@ __do_fork (void *aux) {
 	 * TODO:       the resources of parent.*/
 
 	process_init ();
-
-	// HS 300
+	// printf("do_fork complete\n");
 	sema_up(&current->load_sema);
-
+	// printf("sema_up : %d\n", current->tid);
 	/* Finally, switch to the newly created process. */
 	if (succ)
+		// printf("do_iret\n");
 		do_iret (&if_);
+		// printf("do_iret finish\n");
 error:
+	// msg("thread_exit\n");
 	thread_exit ();
 }
 
@@ -199,7 +211,7 @@ process_exec(void *f_name) {
 
 	/* HS 2-1-0. Command Line Parsing을 위한 변수 선언 */
 	// Command Parsing 관련 변수
-  char *parsing_token;
+ 	char *parsing_token;
 	char *next_token;
 
 	// Stack Organization 관련 변수

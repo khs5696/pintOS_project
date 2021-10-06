@@ -15,15 +15,3 @@ Putting 'child-syn-wrt' into the file system...
 Executing 'syn-write':
 (syn-write) begin
 (syn-write) create "stuff"
-Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
-Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
-The `backtrace' program can make call stacks useful.
-Read "Backtraces" in the "Debugging Tools" chapter
-of the Pintos documentation for more information.
-Timer: 70 ticks
-Thread: 36 idle ticks, 32 kernel ticks, 2 user ticks
-hd0:0: 0 reads, 0 writes
-hd0:1: 132 reads, 512 writes
-hd1:0: 226 reads, 0 writes
-Console: 1251 characters output
-Key

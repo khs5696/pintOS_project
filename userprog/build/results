@@ -49,7 +49,7 @@ FAIL tests/userprog/exec-read
 FAIL tests/userprog/wait-simple
 FAIL tests/userprog/wait-twice
 FAIL tests/userprog/wait-killed
-FAIL tests/userprog/wait-bad-pid
+pass tests/userprog/wait-bad-pid
 FAIL tests/userprog/multi-recurse
 FAIL tests/userprog/multi-child-fd
 FAIL tests/userprog/rox-simple

@@ -171,8 +171,8 @@ seek
 (lg-random) read 512 bytes at offset 19968 failed: FAILED
 lg-random: exit(1)
 Execution of 'lg-random' complete.
-Timer: 92 ticks
-Thread: 34 idle ticks, 32 kernel ticks, 27 user ticks
+Timer: 87 ticks
+Thread: 36 idle ticks, 29 kernel ticks, 22 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 109 reads, 560 writes
 hd1:0: 110 reads, 0 writes

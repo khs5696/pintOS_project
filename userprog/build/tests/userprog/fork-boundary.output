@@ -4,7 +4,7 @@ Kernel command line: -q -f put fork-boundary run fork-boundary
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  111,206,400 loops/s.
+Calibrating timer...  157,081,600 loops/s.
 hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 106 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -13,15 +13,3 @@ Boot complete.
 Putting 'fork-boundary' into the file system...
 Executing 'fork-boundary':
 (fork-boundary) begin
-Kernel PANIC at ../../threads/mmu.c:215 in pml4_get_page(): assertion `is_user_vaddr (uaddr)' failed.
-Call stack: 0x800421883d 0x800420d784 0x800421c050 0x800420d20e 0x800420d2c0 0x800420d365 0x800420d3fd 0x800421c12b 0x80042076a2.
-The `backtrace' program can make call stacks useful.
-Read "Backtraces" in the "Debugging Tools" chapter
-of the Pintos documentation for more information.
-Timer: 74 ticks
-Thread: 34 idle ticks, 38 kernel ticks, 2 user ticks
-hd0:0: 0 reads, 0 writes
-hd0:1: 80 reads, 240 writes
-hd1:0: 106 reads, 0 writes
-Console: 1176 characters output
-Key

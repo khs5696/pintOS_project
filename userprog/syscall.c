@@ -55,8 +55,10 @@ syscall_init (void) {
 // JH 또 user가 전달한 pointer가 mapping 되지 않았을 수도 있음으로 이것도 체크
 // 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
 void check_address (void * addr) {
-	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))
+	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))	{
+		// printf("not valid address\n");
 		exit(-1);
+	}
 }
 
 /* The main system call interface */
@@ -85,7 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			printf("exec\n");
 			break;
 		case SYS_WAIT:
-			printf("wait\n");
+			wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
 			check_address(f->R.rdi);
@@ -96,7 +98,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		case SYS_OPEN:
 			check_address(f->R.rdi);
-      f->R.rax = open(f->R.rdi);
+      		f->R.rax = open(f->R.rdi);
 			break;
 		case SYS_FILESIZE:
 			f->R.rax = filesize(f->R.rdi);
@@ -139,18 +141,31 @@ exit (int status) {
 pid_t fork (const char *thread_name){
     struct intr_frame *user_tf = &thread_current()->tf;
     pid_t child_pid = (pid_t) process_fork(thread_name, user_tf);
-	msg("process_fork success\n");
+	//printf("process_fork success\n");
+	//printf("parent tid : %d\n", thread_current()->tid);	
+	//printf("child_pid : %d\n", child_pid);
+
 	struct thread * child = NULL;
 
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
 		child = list_entry(e, struct thread, child_elem);
 		if (child->tid == child_pid) {
+			// printf("sema_down start\n");
 			sema_down(&child->load_sema);
 			break;
 		}
 	}
-	msg("sema_down success\n");
+	// printf("sema_down success\n");
     return child_pid;
+}
+
+int wait(tid_t child_tid) {
+    /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+    * XXX:       to add infinite loop here before
+    * XXX:       implementing the process_wait. */
+    // struct thread *child_t = list_entry(child_tid, struct thread, elem);
+	// msg("start waiting\n");
+    return process_wait(child_tid);
 }
 
 bool
