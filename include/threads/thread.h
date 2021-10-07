@@ -132,7 +132,7 @@ struct thread {
 	struct semaphore load_sema;
 	// 이건 왜 필요하지?
 	struct thread * parent_thread;	
-
+	struct intr_frame fork_tf;
 	// File Descriptor
 	struct list fd_list;
 

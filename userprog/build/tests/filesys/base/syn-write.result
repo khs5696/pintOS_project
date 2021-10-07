@@ -1,2 +1,15 @@
 FAIL
-Run didn't shut down properly: no "Timer: # ticks" message
+Kernel panic in run: PANIC at ../../userprog/exception.c:95 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x800421883d 0x800421d3ef 0x800420978b 0x8004209ba9 0x800421db35 0x800421d7a8 0x800421d561 0x4007b7 0x400196 0x400fa5 0x400fee
+Translation of call stack:
+0x000000800421883d: debug_panic (lib/kernel/debug.c:32)
+0x000000800421d3ef: kill (userprog/exception.c:101)
+0x000000800420978b: intr_handler (threads/interrupt.c:352)
+0x0000008004209ba9: intr_entry (threads/intr-stubs.o:?)
+0x000000800421db35: wait (userprog/syscall.c:174)
+0x000000800421d7a8: syscall_handler (userprog/syscall.c:90)
+0x000000800421d561: no_sti (userprog/syscall-entry.o:?)
+0x00000000004007b7: (unknown)
+0x0000000000400196: (unknown)
+0x0000000000400fa5: (unknown)
+0x0000000000400fee: (unknown)

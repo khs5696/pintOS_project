@@ -15,6 +15,7 @@
 #include "threads/malloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "userprog/process.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -64,11 +65,9 @@ void check_address (void * addr) {
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
-	//printf("system call\n");
-
 	// TODO: Your implementation goes here.
 	// HS 2-2-1. syscall_handler 구현
-	memcpy(&thread_current()->tf, f, sizeof(struct intr_frame));
+	memcpy(&thread_current()->fork_tf, f, sizeof(struct intr_frame));
 
 	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 해당 시스템 콜(f->R.rax)을 switch문으로 호출
 	// argument가 필요한 시스템 콜의 경우, f->R.rdi가 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
@@ -81,7 +80,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			break;
 		case SYS_FORK:
 			check_address(f->R.rdi);
-			fork(f->R.rdi);
+			f->R.rax = fork(f->R.rdi);
 			break;
 		case SYS_EXEC:
 			printf("exec\n");
@@ -139,23 +138,31 @@ exit (int status) {
 }
 
 pid_t fork (const char *thread_name){
-    struct intr_frame *user_tf = &thread_current()->tf;
+	
+	// if (!strcmp(thread_name, thread_current()->name)) {
+	// 	printf("fork() returns 0\n");
+	// 	return 0;
+	// }
+
+	// 1. process_fork()로 child 스레드 생성
+    struct intr_frame *user_tf = &thread_current()->fork_tf;
     pid_t child_pid = (pid_t) process_fork(thread_name, user_tf);
-	//printf("process_fork success\n");
-	//printf("parent tid : %d\n", thread_current()->tid);	
-	//printf("child_pid : %d\n", child_pid);
+	// printf("(fork) process_fork success\n");
+	// printf("(fork) parent tid : %d\n", thread_current()->tid);	
+	// printf("(fork) child_pid : %d\n", child_pid);
 
 	struct thread * child = NULL;
 
+	// child 스레드의 내용이 완전히 복제될 때까지 sema로 대기
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
 		child = list_entry(e, struct thread, child_elem);
 		if (child->tid == child_pid) {
-			// printf("sema_down start\n");
+			// printf("(fork) sema_down : %d\n", child->tid);
 			sema_down(&child->load_sema);
 			break;
 		}
 	}
-	// printf("sema_down success\n");
+	// printf("(fork) sema_down finish\n");
     return child_pid;
 }
 
@@ -163,8 +170,6 @@ int wait(tid_t child_tid) {
     /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
     * XXX:       to add infinite loop here before
     * XXX:       implementing the process_wait. */
-    // struct thread *child_t = list_entry(child_tid, struct thread, elem);
-	// msg("start waiting\n");
     return process_wait(child_tid);
 }
 

@@ -13,3 +13,17 @@ Boot complete.
 Putting 'fork-recursive' into the file system...
 Executing 'fork-recursive':
 (fork-recursive) begin
+child: exit(-1)
+(fork-recursive) Parent: child exit status is 4
+(fork-recursive) end
+fork-recursive: exit(0)
+Execution of 'fork-recursive' complete.
+Timer: 63 ticks
+Thread: 31 idle ticks, 29 kernel ticks, 3 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 87 reads, 236 writes
+hd1:0: 104 reads, 0 writes
+Console: 944 characters output
+Keyboard: 0 keys pressed
+Exception: 1 page faults
+Powering off...

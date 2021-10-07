@@ -3,6 +3,15 @@ Test output failed to match any acceptable form.
 
 Acceptable output:
   (exec-bad-ptr) begin
+  (exec-bad-ptr) end
+  exec-bad-ptr: exit(0)
+Differences in `diff -u' format:
+  (exec-bad-ptr) begin
++ exec
+  (exec-bad-ptr) end
+  exec-bad-ptr: exit(0)
+Acceptable output:
+  (exec-bad-ptr) begin
   exec-bad-ptr: exit(-1)
 Differences in `diff -u' format:
   (exec-bad-ptr) begin
@@ -10,12 +19,3 @@ Differences in `diff -u' format:
 + exec
 + (exec-bad-ptr) end
 + exec-bad-ptr: exit(0)
-Acceptable output:
-  (exec-bad-ptr) begin
-  (exec-bad-ptr) end
-  exec-bad-ptr: exit(0)
-Differences in `diff -u' format:
-  (exec-bad-ptr) begin
-+ exec
-  (exec-bad-ptr) end
-  exec-bad-ptr: exit(0)

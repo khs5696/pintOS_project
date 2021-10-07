@@ -19,3 +19,5 @@ Executing 'rox-child':
 seek
 (rox-child) write "child-rox"
 (rox-child) exec "child-rox 1"
+child-rox: exit(-1)
+TIMEOUT

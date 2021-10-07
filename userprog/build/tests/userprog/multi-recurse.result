@@ -1,2 +1,2 @@
 FAIL
-Run didn't shut down properly: no "Timer: # ticks" message
+run: wait(exec("multi-recurse 14")) returned 4: FAILED

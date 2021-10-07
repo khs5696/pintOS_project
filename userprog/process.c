@@ -93,15 +93,20 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	// HS 999
-	memcpy(&thread_current()->tf, if_, sizeof(struct intr_frame));
-	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current());	
+	// 검토. 굳이 argument로 if_를 전달해준데는 이유가 있지 않을까....
+	// memcpy(&thread_current()->tf, if_, sizeof(struct intr_frame));
 
-	if (list_empty(&thread_current()->child_list)) {
-		//msg("return child PID\n");
+	// __do_fork(thread_current())를 수행하는 자식 스레드를 새로 생성한다.
+	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current());	
+	// printf("(process_fork) thread_create 성공\n");
+
+	memcpy(&thread_current()->fork_tf, if_, sizeof(struct intr_frame));
+
+	if (list_empty(&thread_current()->child_list)) {	
+		// printf("(process_fork) child process return\n");
 		return 0;		// child process
 	} else {
-		//msg("return parent PID\n");
+		// printf("(process_fork) parent process return\n");
 		return tid;		// parent process
 	}
 }
@@ -119,7 +124,6 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
 	if (is_kernel_vaddr(va)) {
-		//msg("parent is kernel\n");
 		return true;
 	}
 
@@ -157,12 +161,12 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
-	memcpy(parent_if, &parent->tf, sizeof(struct intr_frame));
-	// HS 999. memcpy 부분을 지금 넘어가지 못하고 있음.
+	struct intr_frame *parent_if = &parent->fork_tf;
 	bool succ = true;
 	
-	//printf("aux tid : %d\n", parent->tid);
+	// printf("(do_fork) parent tid : %d\n", parent->tid);
+	// printf("(do_fork) child tid : %d\n", current->tid);
+
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -171,6 +175,7 @@ __do_fork (void *aux) {
 	if (current->pml4 == NULL)
 		goto error;
 
+	// printf("(do_fork) duplicate pt\n");
 	process_activate (current);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
@@ -178,26 +183,38 @@ __do_fork (void *aux) {
 		goto error;
 #else
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
-		//printf("do_fork error\n");
 		goto error;
 	}
 #endif
 
+	// printf("(do_fork) file duplicate\n");
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	struct fd_elem * file_element;
+	struct file * new_file_element;
+	struct fd_elem * new_elem;
+
+	for (struct list_elem * e = list_begin(&parent->fd_list); e != list_end(&parent->fd_list); e = list_next(e)) {
+		file_element = list_entry(e, struct fd_elem, elem);
+		new_file_element = file_duplicate(file_element->file_ptr);
+		new_elem->file_ptr = new_file_element;
+		new_elem->fd = file_element->fd;
+		list_push_back(&current->fd_list, new_elem);
+	}
 
 	process_init ();
-	// printf("do_fork complete\n");
+	// printf("(do_fork) file duplicate complete\n");
 	sema_up(&current->load_sema);
-	// printf("sema_up : %d\n", current->tid);
+	// printf("(do_fork) sema_up : %d\n", current->tid);
 	/* Finally, switch to the newly created process. */
-	if (succ)
-		// printf("do_iret\n");
+	if (succ) {
+		if_.R.rax = 0;
 		do_iret (&if_);
-		// printf("do_iret finish\n");
+		// printf("(do_fork) do_iret finish\n");
+	}
 error:
 	// msg("thread_exit\n");
 	thread_exit ();
