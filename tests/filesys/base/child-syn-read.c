@@ -23,7 +23,6 @@ main (int argc, const char *argv[])
   size_t i;
 
   quiet = true;
-  
   CHECK (argc == 2, "argc must be 2, actually %d", argc);
   child_idx = atoi (argv[1]);
 
@@ -38,7 +37,7 @@ main (int argc, const char *argv[])
       compare_bytes (&c, buf + i, 1, i, file_name);
     }
   close (fd);
-
+  
   return child_idx;
 }
 

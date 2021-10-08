@@ -65,12 +65,21 @@ process_create_initd (const char *file_name) {
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (ptr, PRI_DEFAULT, initd, fn_copy);
 
+	// HS
+	sema_down(&thread_current()->start_sema);
+
 	if (tid == TID_ERROR) {
 		palloc_free_page (fn_copy);
 		palloc_free_page (cmd_name);
 		return TID_ERROR;
 	}
-		
+
+	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+		struct thread * child = list_entry(e, struct thread, child_elem);
+		if (child->exit_status == -1) {
+			return process_wait(tid);
+		}
+	}
 
 	return tid;
 }
@@ -154,11 +163,8 @@ __do_fork (void *aux) {
    struct thread *current = thread_current ();
    /* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
    struct intr_frame *parent_if = &parent->fork_tf;
-   //struct intr_frame *parent_if = malloc(sizeof(struct intr_frame));
    bool succ = true;
    
-   //memcpy(parent_if, &parent->fork_tf, sizeof(struct intr_frame));
-
    /* 1. Read the cpu context to local stack. */
    memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
@@ -193,13 +199,15 @@ __do_fork (void *aux) {
    process_init ();
 
    sema_up(&current->load_sema);
-
+   
+	sema_down(&parent->load_sema);
    //if_.R.rax = 0;
 
    /* Finally, switch to the newly created process. */
    if (succ){
       if_.R.rax = 0;
       do_iret (&if_);
+	  free(new_elem);
    }
       
 error:
@@ -244,11 +252,13 @@ process_exec(void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup();
-	
 	/* And then load the binary */
 	success = load(argv[0], &_if);
 	/* If load failed, quit. */
-	
+
+	// HS
+	sema_up(&thread_current()->parent_thread->start_sema);
+
 	if (!success)
 		return -1;
 	
@@ -311,9 +321,10 @@ process_wait (tid_t child_tid UNUSED) {
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
 		child = list_entry(e, struct thread, child_elem);
 		if (child->tid == child_tid) {
-			sema_down(&thread_current()->fork_sema);
+			sema_down(&child->fork_sema);
 			int result = child->exit_status;
 			list_remove(e);
+			sema_up(&child->exit_sema);
 			return result;
 		}
 	}
@@ -350,7 +361,8 @@ process_exit (void) {
 		}
 	}
 
-	sema_up(&curr->parent_thread->fork_sema);
+	sema_up(&curr->fork_sema);
+	sema_down(&curr->exit_sema);
 }
 
 /* Free the current process's resources. */
@@ -475,6 +487,12 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	// HS 2-4-1. Deny Write on Executables
+	// 실행 중인 유저 프로그램에 대한 변경을 막기 위해 file_deny_write() 사용
+	// 접근 제한은 file_close()의 file_allow_write()에 의해서 프로그램이 종료 될 때 해제
+	// void file_deny_write (struct file *) 메모리에 프로그램 적재 시(load), 프로그램 파일에 쓰기 권한 제거
+	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

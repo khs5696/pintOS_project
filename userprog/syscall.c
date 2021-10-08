@@ -70,8 +70,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// HS 2-2-1. syscall_handler 구현
 	memcpy(&thread_current()->fork_tf, f, sizeof(struct intr_frame));
 
-	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 해당 시스템 콜(f->R.rax)을 switch문으로 호출
-	// argument가 필요한 시스템 콜의 경우, f->R.rdi가 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
+	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 
+	// 시스템 콜 넘버(f->R.rax)에 해당하는 시스템 콜을 switch문으로 호출
+	// 포인터 argument가 필요한 시스템 콜의 경우, 유저 메모리 영역(0~KERN_BASE)에 해당하는지를 확인
+	// 시스템 콜 함수의 반환 값은 f->R.rax에 저장
 	switch (f->R.rax) {
 		case SYS_HALT:
 			halt();
@@ -95,7 +97,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = create(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			printf("remove\n");
+			check_address(f->R.rdi);
+			f->R.rax = remove(f->R.rdi);
 			break;
 		case SYS_OPEN:
 			check_address(f->R.rdi);
@@ -113,10 +116,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 			break;
 		case SYS_SEEK:
-			printf("seek\n");
+			seek(f->R.rdi, f->R.rsi);
 			break;
 		case SYS_TELL:
-			printf("tell\n");
+			f->R.rax = tell(f->R.rdi);
 			break;
 		case SYS_CLOSE:
 			close(f->R.rdi);
@@ -151,6 +154,7 @@ fork (const char *thread_name) {;
          child = list_entry(e, struct thread, child_elem);
          if (child->tid == child_pid) {
             sema_down(&child->load_sema);
+			sema_up(&thread_current()->load_sema);
             break;
          }
       }
@@ -187,26 +191,50 @@ create(const char *file, unsigned initial_size) {
 	return result;
 }
 
+bool
+remove (const char * file) {
+   bool result;
+
+  if (file == NULL){
+         exit(-1);
+  }
+   lock_acquire(&filesys_lock);
+   result = filesys_remove(file);
+   lock_release(&filesys_lock);
+
+   return result;
+}
+
 int
 open(const char * file) {
-	if (file == NULL)
+	if (file == NULL)				// file name error
 		exit(-1);
+	
+	// filesys_open()으로 파일을 여는 동안, synchronization을 통해 추가적인 접근을 제한한다.
 	lock_acquire(&filesys_lock);
 	struct file * open_file = filesys_open(file);
 	lock_release(&filesys_lock);
 
-	if (open_file == NULL) { // file open error
+	if (open_file == NULL) { 		// file open error
 		return -1;
-	} else { // file open complete!
-		struct thread * curr = thread_current();
+	} else { 						// file open complete!
+		/* fd_list에 추가하기 위해 fd_elem 구조체 생성*/
 		struct fd_elem * new_fd = malloc(sizeof(struct fd_elem));
 		
 		// fd를 정하는 과정 - 일단은 fd 계속 증가
 		new_fd->fd = fd_cnt;
-		fd_cnt++;
 		new_fd->file_ptr = open_file;
+		fd_cnt++;
+		
+		// HS 2-4-1. Deny Write on Executables
+		// 실행 중인 유저 프로그램에 대한 변경을 막기 위해 file_deny_write() 사용
+		// 접근 제한은 file_close()의 file_allow_write()에 의해서 프로그램이 종료 될 때 해제
+		if (!strcmp(thread_current()->name, file))
+			// void file_deny_write (struct file *) 메모리에 프로그램 적재 시(load), 프로그램 파일에 쓰기 권한 제거
+			file_deny_write(open_file);
+	
+		list_insert_ordered(&thread_current()->fd_list, &new_fd->elem, compare_by_fd, NULL);
 
-		list_insert_ordered(&curr->fd_list, &new_fd->elem, compare_by_fd, NULL);
 		return new_fd->fd;
 	}
 }
@@ -232,7 +260,7 @@ int
 read (int fd, const void *buffer, unsigned size) {
 	int actually_read_byte = 0;
 	
-	if (fd == 0) { // STDIN
+	if (fd == 0) { 	// STDIN	
 		lock_acquire(&filesys_lock);
 		actually_read_byte = input_getc();
 		lock_release(&filesys_lock);
@@ -273,6 +301,18 @@ write (int fd, const void *buffer, unsigned size) {
 		exit(-1);
 	}
 	NOT_REACHED();
+}
+
+void seek (int fd, unsigned position) {
+	// file_seek()를 이용하여 current position을 new_pos로 변경
+	// void file_seek (struct file *file, off_t new_pos)
+	file_seek(find_file_by_fd(fd), position);
+}
+
+unsigned tell (int fd) {
+	// file_tell()를 이용하여 fd에 해당하는 파일의 current position을 반환
+	// off_t file_tell (struct file *file)
+	return (unsigned) file_tell(find_file_by_fd(fd));
 }
 
 // JH fd가 너무 많아서 구별해주려고 parameter이름 arg_fd로 한거임....

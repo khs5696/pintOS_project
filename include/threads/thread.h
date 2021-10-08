@@ -130,6 +130,8 @@ struct thread {
 	// Child에서 exit call이 발생했을 때, curr->fork_sema를 down 해줌으로써 parent unblock
 	struct semaphore fork_sema;
 	struct semaphore load_sema;
+	struct semaphore exit_sema;
+	struct semaphore start_sema;
 	// 이건 왜 필요하지?
 	struct thread * parent_thread;	
 	struct intr_frame fork_tf;

@@ -393,5 +393,5 @@ compare_by_sema_elem_priority (const struct list_elem *a, const struct list_elem
 
 	int sema_a_first = list_entry (list_begin (&(sema_a->semaphore.waiters)), struct thread, elem)->priority;
 	int sema_b_first = list_entry (list_begin (&(sema_b->semaphore.waiters)), struct thread, elem)->priority;
-	return sema_a_first > sema_b_first;
+	return sema_a_first >= sema_b_first;
 }

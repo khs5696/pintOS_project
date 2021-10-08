@@ -229,7 +229,7 @@ thread_create (const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock (t);
-
+	// printf("ready-list size : %d\n", list_size(&ready_list));
 	// HS 1-2-4. 생성된 스레드의 우선순위가 현재 실행 중인 스레드보다 높을 경우,
 	// 실행 중인 스레드는 CPU를 양보하고 ready_list로 들어간다.
 	if (priority > thread_current()->priority) {
@@ -501,6 +501,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->child_list);
 	sema_init(&t->fork_sema, 0);
 	sema_init(&t->load_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	sema_init(&t->start_sema, 0);
 	list_init(&t->fd_list);
 #endif
 }

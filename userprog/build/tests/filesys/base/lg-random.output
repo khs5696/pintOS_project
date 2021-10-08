@@ -16,167 +16,17 @@ Executing 'lg-random':
 (lg-random) create "bazzle"
 (lg-random) open "bazzle"
 (lg-random) write "bazzle" in random order
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
-seek
 (lg-random) read "bazzle" in random order
-seek
-(lg-random) read 512 bytes at offset 19968 failed: FAILED
-lg-random: exit(1)
+(lg-random) close "bazzle"
+(lg-random) end
+lg-random: exit(0)
 Execution of 'lg-random' complete.
-Timer: 82 ticks
-Thread: 30 idle ticks, 31 kernel ticks, 22 user ticks
+Timer: 69 ticks
+Thread: 31 idle ticks, 29 kernel ticks, 9 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 109 reads, 560 writes
+hd0:1: 259 reads, 560 writes
 hd1:0: 110 reads, 0 writes
-Console: 1778 characters output
+Console: 1007 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...
