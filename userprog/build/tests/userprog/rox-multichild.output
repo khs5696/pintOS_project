@@ -19,5 +19,17 @@ Executing 'rox-multichild':
 seek
 (rox-multichild) write "child-rox"
 (rox-multichild) exec "child-rox 5"
+load: child-rox: error loading executable
 child-rox: exit(-1)
-TIMEOUT
+(rox-multichild) wait for child: FAILED
+rox-multichild: exit(1)
+Execution of 'rox-multichild' complete.
+Timer: 71 ticks
+Thread: 33 idle ticks, 34 kernel ticks, 4 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 118 reads, 479 writes
+hd1:0: 220 reads, 0 writes
+Console: 1165 characters output
+Keyboard: 0 keys pressed
+Exception: 1 page faults
+Powering off...

@@ -4,7 +4,7 @@ Kernel command line: -q -f put multi-oom run multi-oom
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  209,510,400 loops/s.
+Calibrating timer...  104,755,200 loops/s.
 hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -13,17 +13,36 @@ Boot complete.
 Putting 'multi-oom' into the file system...
 Executing 'multi-oom':
 (multi-oom) begin
-child_0_O: exit(-1)
-(multi-oom) Spawned at least 10 children.
-(multi-oom) Spawned at least 10 children.: FAILED
-multi-oom: exit(1)
-Execution of 'multi-oom' complete.
-Timer: 66 ticks
-Thread: 35 idle ticks, 29 kernel ticks, 2 user ticks
-hd0:0: 0 reads, 0 writes
-hd0:1: 83 reads, 242 writes
-hd1:0: 107 reads, 0 writes
-Console: 936 characters output
-Keyboard: 0 keys pressed
-Exception: 1 page faults
-Powering off...
+child_6_X: exit(-1)
+child_7_X: exit(-1)
+child_8_X: exit(-1)
+child_9_X: exit(-1)
+child_10_X: exit(-1)
+child_11_X: exit(-1)
+child_12_X: exit(-1)
+child_13_X: exit(-1)
+child_14_X: exit(-1)
+child_15_X: exit(-1)
+child_16_X: exit(-1)
+child_17_X: exit(-1)
+child_18_X: exit(-1)
+child_19_X: exit(-1)
+child_20_X: exit(-1)
+child_21_X: exit(-1)
+child_22_X: exit(-1)
+child_23_X: exit(-1)
+child_24_X: exit(-1)
+child_25_X: exit(-1)
+child_26_X: exit(-1)
+child_27_X: exit(-1)
+child_28_X: exit(-1)
+child_29_X: exit(-1)
+child_30_X: exit(-1)
+child_31_X: exit(-1)
+child_32_X: exit(-1)
+child_33_X: exit(-1)
+child_34_X: exit(-1)
+child_35_X: exit(-1)
+child_36_X: exit(-1)
+child_36_O: exit(-1)
+TIMEOUT

@@ -1,2 +1,2 @@
 FAIL
-run: TIMEOUT
+run: wait for child: FAILED

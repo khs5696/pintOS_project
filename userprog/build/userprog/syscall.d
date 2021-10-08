@@ -12,4 +12,5 @@ userprog/syscall.o: ../../userprog/syscall.c \
  ../../include/threads/vaddr.h ../../include/devices/input.h \
  ../../include/threads/init.h ../../include/threads/malloc.h \
  ../../include/filesys/filesys.h ../../include/filesys/off_t.h \
- ../../include/filesys/file.h ../../include/userprog/process.h
+ ../../include/filesys/file.h ../../include/userprog/process.h \
+ ../../include/threads/palloc.h

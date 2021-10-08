@@ -19,5 +19,17 @@ Executing 'rox-child':
 seek
 (rox-child) write "child-rox"
 (rox-child) exec "child-rox 1"
+load: child-rox: error loading executable
 child-rox: exit(-1)
-TIMEOUT
+(rox-child) wait for child: FAILED
+rox-child: exit(1)
+Execution of 'rox-child' complete.
+Timer: 68 ticks
+Thread: 36 idle ticks, 28 kernel ticks, 4 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 118 reads, 479 writes
+hd1:0: 220 reads, 0 writes
+Console: 1105 characters output
+Keyboard: 0 keys pressed
+Exception: 1 page faults
+Powering off...

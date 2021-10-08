@@ -561,7 +561,6 @@ thread_launch (struct thread *th) {
 	uint64_t tf_cur = (uint64_t) &running_thread ()->tf;
 	uint64_t tf = (uint64_t) &th->tf;
 	ASSERT (intr_get_level () == INTR_OFF);
-
 	/* The main switching logic.
 	 * We first restore the whole execution context into the intr_frame
 	 * and then switching to the next thread by calling do_iret.

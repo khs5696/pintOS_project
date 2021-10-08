@@ -16,6 +16,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -83,10 +84,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = fork(f->R.rdi);
 			break;
 		case SYS_EXEC:
-			printf("exec\n");
+			check_address(f->R.rdi);
+			f->R.rax = exec(f->R.rdi);
 			break;
 		case SYS_WAIT:
-			wait(f->R.rdi);
+			f->R.rax = wait(f->R.rdi);
 			break;
 		case SYS_CREATE:
 			check_address(f->R.rdi);
@@ -137,33 +139,33 @@ exit (int status) {
 	thread_exit();
 }
 
-pid_t fork (const char *thread_name){
-	
-	// if (!strcmp(thread_name, thread_current()->name)) {
-	// 	printf("fork() returns 0\n");
-	// 	return 0;
-	// }
+pid_t
+fork (const char *thread_name) {;
+   pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
+   if (child_pid == TID_ERROR)
+      return TID_ERROR;
+   else {
+      struct thread * child = NULL;
 
-	// 1. process_fork()로 child 스레드 생성
-    struct intr_frame *user_tf = &thread_current()->fork_tf;
-    pid_t child_pid = (pid_t) process_fork(thread_name, user_tf);
-	// printf("(fork) process_fork success\n");
-	// printf("(fork) parent tid : %d\n", thread_current()->tid);	
-	// printf("(fork) child_pid : %d\n", child_pid);
+      for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+         child = list_entry(e, struct thread, child_elem);
+         if (child->tid == child_pid) {
+            sema_down(&child->load_sema);
+            break;
+         }
+      }
+      return child_pid;
+   }
+   NOT_REACHED(); 
+}
 
-	struct thread * child = NULL;
-
-	// child 스레드의 내용이 완전히 복제될 때까지 sema로 대기
-	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-		child = list_entry(e, struct thread, child_elem);
-		if (child->tid == child_pid) {
-			// printf("(fork) sema_down : %d\n", child->tid);
-			sema_down(&child->load_sema);
-			break;
-		}
-	}
-	// printf("(fork) sema_down finish\n");
-    return child_pid;
+int
+exec (const char * cmd_line) {
+   char * cmd_copy = (char *) malloc(strlen(cmd_line)+1);
+   strlcpy(cmd_copy, cmd_line, strlen(cmd_line)+1);
+   int result = process_exec(cmd_copy);
+   thread_current()->exit_status = result;
+   return result;
 }
 
 int wait(tid_t child_tid) {
@@ -235,7 +237,7 @@ read (int fd, const void *buffer, unsigned size) {
 		actually_read_byte = input_getc();
 		lock_release(&filesys_lock);
 		return actually_read_byte;
-	} else if (fd >= 3) {
+	} else if (fd >= 3) {	
 		struct file * read_file = find_file_by_fd(fd);
 		if (read_file != NULL) {
 			lock_acquire(&filesys_lock);
@@ -281,7 +283,6 @@ close (int arg_fd) {
 	struct list_elem * e;
 	struct fd_elem * close_fd = NULL;
 	bool find_fd = false;
-
 	for (e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
 		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
 		if (arg_fd == tmp_fd->fd) { // closing 할 fd 발견!

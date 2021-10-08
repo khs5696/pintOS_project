@@ -24,8 +24,8 @@ seek
 (syn-remove) read "deleteme": FAILED
 syn-remove: exit(1)
 Execution of 'syn-remove' complete.
-Timer: 74 ticks
-Thread: 40 idle ticks, 29 kernel ticks, 5 user ticks
+Timer: 70 ticks
+Thread: 36 idle ticks, 30 kernel ticks, 4 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 109 reads, 264 writes
 hd1:0: 109 reads, 0 writes

@@ -91,24 +91,16 @@ initd (void *f_name) {
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
-tid_t process_fork (const char *name, struct intr_frame *if_ UNUSED) {
-	/* Clone current thread to new thread.*/
-	// 검토. 굳이 argument로 if_를 전달해준데는 이유가 있지 않을까....
-	// memcpy(&thread_current()->tf, if_, sizeof(struct intr_frame));
-
-	// __do_fork(thread_current())를 수행하는 자식 스레드를 새로 생성한다.
-	tid_t tid = thread_create (name, PRI_DEFAULT, __do_fork, thread_current());	
-	// printf("(process_fork) thread_create 성공\n");
-
-	memcpy(&thread_current()->fork_tf, if_, sizeof(struct intr_frame));
-
-	if (list_empty(&thread_current()->child_list)) {	
-		// printf("(process_fork) child process return\n");
-		return 0;		// child process
-	} else {
-		// printf("(process_fork) parent process return\n");
-		return tid;		// parent process
-	}
+tid_t
+process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+   /* Clone current thread to new thread.*/
+   tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
+   
+   if (list_empty(&thread_current()->child_list)) {
+      return 0;      // child process
+   } else {
+      return tid;      // parent process
+   }  
 }
 
 #ifndef VM
@@ -137,7 +129,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
-	memcpy(newpage, parent_page, sizeof(PAL_USER));
+	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
@@ -157,67 +149,61 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  *       this function. */
 static void
 __do_fork (void *aux) {
-	struct intr_frame if_;
-	struct thread *parent = (struct thread *) aux;
-	struct thread *current = thread_current ();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->fork_tf;
-	bool succ = true;
-	
-	// printf("(do_fork) parent tid : %d\n", parent->tid);
-	// printf("(do_fork) child tid : %d\n", current->tid);
+   struct intr_frame if_;
+   struct thread *parent = (struct thread *) aux;
+   struct thread *current = thread_current ();
+   /* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+   struct intr_frame *parent_if = &parent->fork_tf;
+   //struct intr_frame *parent_if = malloc(sizeof(struct intr_frame));
+   bool succ = true;
+   
+   //memcpy(parent_if, &parent->fork_tf, sizeof(struct intr_frame));
 
-	/* 1. Read the cpu context to local stack. */
-	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+   /* 1. Read the cpu context to local stack. */
+   memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
-	/* 2. Duplicate PT */
-	current->pml4 = pml4_create();
-	if (current->pml4 == NULL)
-		goto error;
+   /* 2. Duplicate PT */
+   current->pml4 = pml4_create();
+   if (current->pml4 == NULL)
+      goto error;
 
-	// printf("(do_fork) duplicate pt\n");
-	process_activate (current);
+   process_activate (current);
 #ifdef VM
-	supplemental_page_table_init (&current->spt);
-	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
-		goto error;
+   supplemental_page_table_init (&current->spt);
+   if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+      goto error;
 #else
-	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
-		goto error;
-	}
+   if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+      goto error;
 #endif
+   /* TODO: Your code goes here.
+    * TODO: Hint) To duplicate the file object, use `file_duplicate`
+    * TODO:       in include/filesys/file.h. Note that parent should not return
+    * TODO:       from the fork() until this function successfully duplicates
+    * TODO:       the resources of parent.*/
+   for (struct list_elem * e = list_begin(&parent->fd_list); e != list_end(&parent->fd_list); e = list_next(e)) {
+      struct fd_elem * file_element = list_entry(e, struct fd_elem, elem);
+      struct file * new_file_element = file_duplicate(file_element->file_ptr);
+      struct fd_elem * new_elem = (struct fd_elem *) malloc(sizeof(struct fd_elem));
+      new_elem->file_ptr = new_file_element;
+      new_elem->fd = file_element->fd;
+      list_push_back(&current->fd_list, &new_elem->elem);
+   }
 
-	// printf("(do_fork) file duplicate\n");
-	/* TODO: Your code goes here.
-	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
-	 * TODO:       in include/filesys/file.h. Note that parent should not return
-	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
-	struct fd_elem * file_element;
-	struct file * new_file_element;
-	struct fd_elem * new_elem;
+   process_init ();
 
-	for (struct list_elem * e = list_begin(&parent->fd_list); e != list_end(&parent->fd_list); e = list_next(e)) {
-		file_element = list_entry(e, struct fd_elem, elem);
-		new_file_element = file_duplicate(file_element->file_ptr);
-		new_elem->file_ptr = new_file_element;
-		new_elem->fd = file_element->fd;
-		list_push_back(&current->fd_list, new_elem);
-	}
+   sema_up(&current->load_sema);
 
-	process_init ();
-	// printf("(do_fork) file duplicate complete\n");
-	sema_up(&current->load_sema);
-	// printf("(do_fork) sema_up : %d\n", current->tid);
-	/* Finally, switch to the newly created process. */
-	if (succ) {
-		if_.R.rax = 0;
-		do_iret (&if_);
-		// printf("(do_fork) do_iret finish\n");
-	}
+   //if_.R.rax = 0;
+
+   /* Finally, switch to the newly created process. */
+   if (succ){
+      if_.R.rax = 0;
+      do_iret (&if_);
+   }
+      
 error:
-	// msg("thread_exit\n");
-	thread_exit ();
+   thread_exit ();
 }
 
 
@@ -232,9 +218,9 @@ process_exec(void *f_name) {
 	char *next_token;
 
 	// Stack Organization 관련 변수
-  int argc = 0; 
+	int argc = 0; 
 	int command_len = 0;			// alignment를 위해 token들이 stack에서 차지하는 byte
-  char *argv[50];
+	char *argv[50];	
 	char *command_address[50];		// stack에서의 각 token 주소(포인터)를 저장할 배열
 
 	/* HS 2-1-1. Command Parsing */
@@ -321,11 +307,13 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       implementing the process_wait. */
 	struct thread * child = NULL;
 
+	// child_tid에 해당하는 자식 스레드를 child_list에서 탐색
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
 		child = list_entry(e, struct thread, child_elem);
 		if (child->tid == child_tid) {
-			sema_down(&child->fork_sema);
+			sema_down(&thread_current()->fork_sema);
 			int result = child->exit_status;
+			list_remove(e);
 			return result;
 		}
 	}
@@ -353,14 +341,16 @@ process_exit (void) {
 			lock_release(&filesys_lock);
 		}
 	}
-	sema_up(&curr->fork_sema);
 
+	// child_list의 자식 스레드들과의 연결을 끊어준다.
+	for (struct list_elem * e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e)) {
+		struct thread * tmp = list_entry(e, struct thread, child_elem);
+		if (tmp->parent_thread == curr) {
+			tmp->parent_thread = NULL;
+		}
+	}
 
-
-	// enum intr_level old_level;
-	// old_level = intr_disable ();
-	// thread_block();
-	// intr_set_level (old_level);
+	sema_up(&curr->parent_thread->fork_sema);
 }
 
 /* Free the current process's resources. */
