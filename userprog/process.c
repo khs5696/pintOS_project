@@ -346,20 +346,19 @@ process_exit (void) {
 
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
-	if (!list_empty(&curr->fd_list)) {
-		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
-			struct fd_elem * tmp = list_entry(e, struct fd_elem, elem);
-			lock_acquire(&filesys_lock);
-			file_close(tmp->file_ptr);
-			lock_release(&filesys_lock);
-		}
+	while (!list_empty(&curr->fd_list)) {
+		struct fd_elem * tmp = list_entry(list_pop_front(&curr->fd_list), struct fd_elem, elem);
+		lock_acquire(&filesys_lock);
+		file_close(tmp->file_ptr);
+		lock_release(&filesys_lock);
+		free(tmp);
 	}
 
 	// child_list의 자식 스레드들과의 연결을 끊어준다.
-	for (struct list_elem * e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e)) {
-		struct thread * tmp = list_entry(e, struct thread, child_elem);
+	while (!list_empty(&curr->child_list)) {
+		struct thread * tmp = list_entry(list_pop_front(&curr->child_list), struct thread, child_elem);
 		if (tmp->parent_thread == curr) {
-			tmp->parent_thread = NULL;
+				tmp->parent_thread = NULL;
 		}
 	}
 
