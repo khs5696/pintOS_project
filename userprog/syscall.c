@@ -154,7 +154,7 @@ fork (const char *thread_name) {;
          child = list_entry(e, struct thread, child_elem);
          if (child->tid == child_pid) {
             sema_down(&child->load_sema);
-			sema_up(&thread_current()->load_sema);
+						sema_up(&thread_current()->load_sema);
             break;
          }
       }
@@ -208,7 +208,7 @@ remove (const char * file) {
 int
 open(const char * file) {
 	if (file == NULL)				// file name error
-		exit(-1);
+		return -1;
 	
 	// filesys_open()으로 파일을 여는 동안, synchronization을 통해 추가적인 접근을 제한한다.
 	lock_acquire(&filesys_lock);
@@ -216,6 +216,11 @@ open(const char * file) {
 	lock_release(&filesys_lock);
 
 	if (open_file == NULL) { 		// file open error
+		return -1;
+	} else if(list_size(&thread_current()->fd_list) > 129) {
+		lock_acquire(&filesys_lock);
+		file_close(open_file);
+		lock_release(&filesys_lock);
 		return -1;
 	} else { 						// file open complete!
 		/* fd_list에 추가하기 위해 fd_elem 구조체 생성*/

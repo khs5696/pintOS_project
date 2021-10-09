@@ -65,14 +65,16 @@ process_create_initd (const char *file_name) {
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (ptr, PRI_DEFAULT, initd, fn_copy);
 
-	// HS
-	sema_down(&thread_current()->start_sema);
+	
 
 	if (tid == TID_ERROR) {
 		palloc_free_page (fn_copy);
 		palloc_free_page (cmd_name);
 		return TID_ERROR;
 	}
+
+	// HS
+	sema_down(&thread_current()->start_sema);
 
 	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
 		struct thread * child = list_entry(e, struct thread, child_elem);
@@ -207,7 +209,7 @@ __do_fork (void *aux) {
    if (succ){
       if_.R.rax = 0;
       do_iret (&if_);
-	  free(new_elem);
+	  //free(new_elem);
    }
       
 error:
