@@ -362,7 +362,7 @@ process_exit (void) {
 	while (!list_empty(&curr->child_list)) {
 		struct thread * tmp = list_entry(list_pop_front(&curr->child_list), struct thread, child_elem);
 		if (tmp->parent_thread == curr) {
-			tmp->parent_thread = NULL;
+				tmp->parent_thread = NULL;
 		}
 	}
 
