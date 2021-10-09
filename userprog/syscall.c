@@ -143,8 +143,9 @@ exit (int status) {
 }
 
 pid_t
-fork (const char *thread_name) {;
+fork (const char *thread_name) {
    pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
+   // printf("process_fork success\n");
    if (child_pid == TID_ERROR)
       return TID_ERROR;
    else {
@@ -154,7 +155,10 @@ fork (const char *thread_name) {;
          child = list_entry(e, struct thread, child_elem);
          if (child->tid == child_pid) {
             sema_down(&child->load_sema);
-						sema_up(&thread_current()->load_sema);
+			if (child->do_fork_success == false) {
+				return -1;
+			}
+			sema_up(&thread_current()->load_sema);
             break;
          }
       }
@@ -216,8 +220,10 @@ open(const char * file) {
 	lock_release(&filesys_lock);
 
 	if (open_file == NULL) { 		// file open error
+		// printf("open fail : open file is NULL\n");
 		return -1;
 	} else if(list_size(&thread_current()->fd_list) > 129) {
+		// printf("open fail : list_size is larger than 129\n");
 		lock_acquire(&filesys_lock);
 		file_close(open_file);
 		lock_release(&filesys_lock);

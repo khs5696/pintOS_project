@@ -69,7 +69,6 @@ sema_down (struct semaphore *sema) {
 		// HS 1-3-1. 실행 중인 스레드가 CA를 사용하고자 할 때
 		// 우선순위에 따라 정렬하여 sema의 waiters 리스트에 삽입한다.
 		list_insert_ordered(&sema->waiters, &thread_current ()->elem, compare_by_priority, NULL);
-
 		thread_block ();
 	}
 	sema->value--;

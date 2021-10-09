@@ -504,6 +504,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	sema_init(&t->exit_sema, 0);
 	sema_init(&t->start_sema, 0);
 	list_init(&t->fd_list);
+	t->do_fork_success = true;
 #endif
 }
 

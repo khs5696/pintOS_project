@@ -106,7 +106,6 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
    /* Clone current thread to new thread.*/
    tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
-   
    if (list_empty(&thread_current()->child_list)) {
       return 0;      // child process
    } else {
@@ -176,13 +175,15 @@ __do_fork (void *aux) {
       goto error;
 
    process_activate (current);
+
 #ifdef VM
    supplemental_page_table_init (&current->spt);
    if (!supplemental_page_table_copy (&current->spt, &parent->spt))
       goto error;
 #else
-   if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+   if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
       goto error;
+   }
 #endif
    /* TODO: Your code goes here.
     * TODO: Hint) To duplicate the file object, use `file_duplicate`
@@ -213,7 +214,12 @@ __do_fork (void *aux) {
    }
       
 error:
-   thread_exit ();
+	current->do_fork_success = false;
+	sema_up(&current->load_sema);
+	sema_down(&parent->load_sema);
+	// current->exit_status = -1;
+	printf ("%s: exit(%d)\n", current->name, current->exit_status);
+	thread_exit ();
 }
 
 
@@ -342,29 +348,29 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	process_cleanup ();
-
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
-	if (!list_empty(&curr->fd_list)) {
-		for (struct list_elem * e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
-			struct fd_elem * tmp = list_entry(e, struct fd_elem, elem);
-			lock_acquire(&filesys_lock);
-			file_close(tmp->file_ptr);
-			lock_release(&filesys_lock);
-		}
-	}
+	while (!list_empty(&curr->fd_list)) {
+    	struct fd_elem * tmp = list_entry(list_pop_front(&curr->fd_list), struct fd_elem, elem);
+    	lock_acquire(&filesys_lock);
+      	file_close(tmp->file_ptr);
+	    lock_release(&filesys_lock);
+      	free(tmp);
+    }
 
 	// child_list의 자식 스레드들과의 연결을 끊어준다.
-	for (struct list_elem * e = list_begin(&curr->child_list); e != list_end(&curr->child_list); e = list_next(e)) {
-		struct thread * tmp = list_entry(e, struct thread, child_elem);
+	while (!list_empty(&curr->child_list)) {
+		struct thread * tmp = list_entry(list_pop_front(&curr->child_list), struct thread, child_elem);
 		if (tmp->parent_thread == curr) {
 			tmp->parent_thread = NULL;
 		}
 	}
 
 	sema_up(&curr->fork_sema);
+	
 	sema_down(&curr->exit_sema);
+	
+	process_cleanup ();
 }
 
 /* Free the current process's resources. */

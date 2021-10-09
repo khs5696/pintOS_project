@@ -137,6 +137,7 @@ struct thread {
 	struct intr_frame fork_tf;
 	// File Descriptor
 	struct list fd_list;
+	bool do_fork_success;
 
 	unsigned magic;                     /* Detects stack overflow. */
 };
