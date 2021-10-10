@@ -146,22 +146,46 @@ pid_t
 fork (const char *thread_name) {;
     pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
     if (child_pid == TID_ERROR)
-    	return TID_ERROR;
+    	return TID_ERROR;		// fork로 새로운 프로세스를 만드는 것에 실패
     else {
     	struct thread * child = NULL;
 
-    	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-        	child = list_entry(e, struct thread, child_elem);
-        	if (child->tid == child_pid) {
-        		sema_down(&child->load_sema);
-				//여기서 만약 exit_status가 -1이면 바로 그냥 return TID_ERROR;
-				sema_up(&thread_current()->load_sema);
-            break;
-         }
-      }
-      return child_pid;
-   }
-   NOT_REACHED(); 
+    	// for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+        // 	child = list_entry(e, struct thread, child_elem);
+        // 	if (child->tid == child_pid) {
+        // 		sema_down(&child->load_sema);
+		// 		//여기서 만약 exit_status가 -1이면 바로 그냥 return TID_ERROR;
+		// 		sema_up(&thread_current()->load_sema);
+        //     	break;
+        // 	}
+    	// }
+		for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+			struct thread * tmp = list_entry(e, struct thread, child_elem);
+			if (tmp->tid == child_pid) {
+				child = tmp;
+				break;
+			}
+		}
+		if (child == NULL) {		// 만들기는 만들었는데, child_list에서 찾아보니까 없는 경우 -> process_fork가 이상함....
+			return TID_ERROR;
+		} else {
+			// __do_fork()를 실행할 프로세스를 새로 만들었지만, 아직 함수가 실행 되지 않았음으로
+			// __do_fork()를 실행시켜 부모 프로세스를 완전히 복제할 수 있도록 기다려주는 역할
+			sema_down(&child->load_sema);
+
+			// 자식 프로세스가 'sema_down(&parent->load_sema);'를 실행시킴으로써 user program을 실행시키기 전
+			// 부모에게 주도권을 한번 넘겨준 상황 -> 만약 child가 __do_fork 중 비정상적으로 끝났다면,
+			// 바로 return TID_ERROR
+			if (child->exit_status == -1) {
+				return TID_ERROR;
+			}
+			// 다시 sema_up을 통해 자식이 이후에 정상적으로 do_iret을 할 수 있도록 해주는 역할
+			sema_up(&thread_current()->load_sema);
+
+		}
+    	return child_pid;
+	}
+	NOT_REACHED(); 
 }
 
 int

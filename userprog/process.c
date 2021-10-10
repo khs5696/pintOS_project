@@ -169,64 +169,71 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  *       this function. */
 static void
 __do_fork (void *aux) {
-   struct intr_frame if_;
-   struct thread *parent = (struct thread *) aux;
-   struct thread *current = thread_current ();
-   /* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-   struct intr_frame *parent_if = &parent->fork_tf;
-   bool succ = true;
-   
-   /* 1. Read the cpu context to local stack. */
-   memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	struct intr_frame if_;
+	struct thread *parent = (struct thread *) aux;
+	struct thread *current = thread_current ();
+	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+	struct intr_frame *parent_if = &parent->fork_tf;
+	bool succ = true;
+	
+	/* 1. Read the cpu context to local stack. */
+	memcpy (&if_, parent_if, sizeof (struct intr_frame));
 
-   /* 2. Duplicate PT */
-   current->pml4 = pml4_create();
-   if (current->pml4 == NULL)
-      goto error;
+	/* 2. Duplicate PT */
+	current->pml4 = pml4_create();
+	if (current->pml4 == NULL)
+		goto error;
 
-   process_activate (current);
+	process_activate (current);
 
 #ifdef VM
-   supplemental_page_table_init (&current->spt);
-   if (!supplemental_page_table_copy (&current->spt, &parent->spt))
-      goto error;
+	supplemental_page_table_init (&current->spt);
+	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
+		goto error;
 #else
-   if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
-      goto error;
-   }
+	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
+		goto error;
+	}
 #endif
    /* TODO: Your code goes here.
     * TODO: Hint) To duplicate the file object, use `file_duplicate`
     * TODO:       in include/filesys/file.h. Note that parent should not return
     * TODO:       from the fork() until this function successfully duplicates
     * TODO:       the resources of parent.*/
-   for (struct list_elem * e = list_begin(parent->fd_list); e != list_end(parent->fd_list); e = list_next(e)) {
-      struct fd_elem * file_element = list_entry(e, struct fd_elem, elem);
-      struct file * new_file_element = file_duplicate(file_element->file_ptr);
-      struct fd_elem * new_elem = (struct fd_elem *) malloc(sizeof(struct fd_elem));
-      new_elem->file_ptr = new_file_element;
-      new_elem->fd = file_element->fd;
-      list_push_back(current->fd_list, &new_elem->elem);
-   }
+	for (struct list_elem * e = list_begin(parent->fd_list); e != list_end(parent->fd_list); e = list_next(e)) {
+		struct fd_elem * file_element = list_entry(e, struct fd_elem, elem);
+		struct file * new_file_element = file_duplicate(file_element->file_ptr);
+		if (new_file_element == NULL)
+			goto error;
+		struct fd_elem * new_elem = (struct fd_elem *) malloc(sizeof(struct fd_elem));
+		if (new_elem == NULL)
+			goto error;
+		new_elem->file_ptr = new_file_element;
+		new_elem->fd = file_element->fd;
+		list_push_back(current->fd_list, &new_elem->elem);
+	}
 
-   process_init ();
-
-   sema_up(&current->load_sema);
-   
+   	process_init ();
+	// 부모 프로세스를 제대로 복제하였음으로, 자신을 그만 기다려도 된다고 신호를 주는 역할
+   	sema_up(&current->load_sema);
+	// JH : fork의 제대로된 역할은 부모 프로세스를 그대로 복제하는 자식 프로세스를 만드는 것에서 그쳐야 한다고 생각
+	// 따라서 아래의 do_iret이 실행되면 복제하는 것도 모자라 바로 실행까지 시켜버림으로 그것을 방지하고 복제까지만
+	// 하도록 하기 위한 역할
 	sema_down(&parent->load_sema);
-   //if_.R.rax = 0;
 
-   /* Finally, switch to the newly created process. */
-   if (succ){
-      if_.R.rax = 0;
-      do_iret (&if_);
-	  //free(new_elem);
-   }
+	/* Finally, switch to the newly created process. */
+	if (succ){
+		if_.R.rax = 0;
+		do_iret (&if_);
+	}
       
 error:
-	// sema_up(&current->load_sema);
-	// thread_current()->exit_status = -1;
-	// sema_down(&parent->load_sema);
+	sema_up(&current->load_sema);
+	// 중간에 실패했을 경우, 프로세스를 복제하는데 실패했음을 표시하고,
+	// 부모가 이 사실을 알 수 있도록 기다림.
+	thread_current()->exit_status = -1;
+	sema_down(&parent->load_sema);
+	
    	thread_exit ();
 }
 
@@ -377,9 +384,7 @@ process_exit (void) {
 	}
 
 	sema_up(&curr->fork_sema);
-	
 	sema_down(&curr->exit_sema);
-	
 	process_cleanup ();
 }
 
