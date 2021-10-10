@@ -136,7 +136,7 @@ struct thread {
 	struct thread * parent_thread;	
 	struct intr_frame fork_tf;
 	// File Descriptor
-	struct list fd_list;
+	struct list * fd_list;
 
 	unsigned magic;                     /* Detects stack overflow. */
 };

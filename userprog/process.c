@@ -107,11 +107,19 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
    /* Clone current thread to new thread.*/
    tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
    
-   if (list_empty(&thread_current()->child_list)) {
-      return 0;      // child process
-   } else {
-      return tid;      // parent process
-   }  
+//    if (list_empty(&thread_current()->child_list)) {
+//       return 0;      // child process
+//    } else {
+//       return tid;      // parent process
+//    } 
+	// JH 스레드를 만들기만 하고 다시 돌아옴 thread_create 안에 init_thread에서
+	// 현재 스레드의 child_list에 새로 생성하는 thread를 넣는 작업이 있기 때문에
+	// 이게 이루어 지지 않았다면, 현재 스레드의 child_list가 비어있을 것임!
+	if (!list_empty(&thread_current()->child_list)) {
+		return tid;
+	} else {
+		return TID_ERROR;
+	}
 }
 
 #ifndef VM
@@ -129,13 +137,14 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	if (is_kernel_vaddr(va)) {
 		return true;
 	}
-
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
 	newpage = palloc_get_page(PAL_USER);
+	if (!newpage)
+		return false;
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
@@ -189,13 +198,13 @@ __do_fork (void *aux) {
     * TODO:       in include/filesys/file.h. Note that parent should not return
     * TODO:       from the fork() until this function successfully duplicates
     * TODO:       the resources of parent.*/
-   for (struct list_elem * e = list_begin(&parent->fd_list); e != list_end(&parent->fd_list); e = list_next(e)) {
+   for (struct list_elem * e = list_begin(parent->fd_list); e != list_end(parent->fd_list); e = list_next(e)) {
       struct fd_elem * file_element = list_entry(e, struct fd_elem, elem);
       struct file * new_file_element = file_duplicate(file_element->file_ptr);
       struct fd_elem * new_elem = (struct fd_elem *) malloc(sizeof(struct fd_elem));
       new_elem->file_ptr = new_file_element;
       new_elem->fd = file_element->fd;
-      list_push_back(&current->fd_list, &new_elem->elem);
+      list_push_back(current->fd_list, &new_elem->elem);
    }
 
    process_init ();
@@ -213,7 +222,10 @@ __do_fork (void *aux) {
    }
       
 error:
-   thread_exit ();
+	// sema_up(&current->load_sema);
+	// thread_current()->exit_status = -1;
+	// sema_down(&parent->load_sema);
+   	thread_exit ();
 }
 
 
@@ -346,13 +358,15 @@ process_exit (void) {
 
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
-	while (!list_empty(&curr->fd_list)) {
-		struct fd_elem * tmp = list_entry(list_pop_front(&curr->fd_list), struct fd_elem, elem);
+	while (!list_empty(curr->fd_list)) {
+		struct fd_elem * tmp = list_entry(list_pop_front(curr->fd_list), struct fd_elem, elem);
 		lock_acquire(&filesys_lock);
 		file_close(tmp->file_ptr);
 		lock_release(&filesys_lock);
 		free(tmp);
 	}
+
+	free(curr->fd_list);
 
 	// child_list의 자식 스레드들과의 연결을 끊어준다.
 	while (!list_empty(&curr->child_list)) {

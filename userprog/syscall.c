@@ -144,17 +144,18 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name) {;
-   pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
-   if (child_pid == TID_ERROR)
-      return TID_ERROR;
-   else {
-      struct thread * child = NULL;
+    pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
+    if (child_pid == TID_ERROR)
+    	return TID_ERROR;
+    else {
+    	struct thread * child = NULL;
 
-      for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-         child = list_entry(e, struct thread, child_elem);
-         if (child->tid == child_pid) {
-            sema_down(&child->load_sema);
-						sema_up(&thread_current()->load_sema);
+    	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
+        	child = list_entry(e, struct thread, child_elem);
+        	if (child->tid == child_pid) {
+        		sema_down(&child->load_sema);
+				//여기서 만약 exit_status가 -1이면 바로 그냥 return TID_ERROR;
+				sema_up(&thread_current()->load_sema);
             break;
          }
       }
@@ -217,7 +218,7 @@ open(const char * file) {
 
 	if (open_file == NULL) { 		// file open error
 		return -1;
-	} else if(list_size(&thread_current()->fd_list) > 129) {
+	} else if(list_size(thread_current()->fd_list) > 130) {
 		lock_acquire(&filesys_lock);
 		file_close(open_file);
 		lock_release(&filesys_lock);
@@ -238,7 +239,7 @@ open(const char * file) {
 			// void file_deny_write (struct file *) 메모리에 프로그램 적재 시(load), 프로그램 파일에 쓰기 권한 제거
 			file_deny_write(open_file);
 	
-		list_insert_ordered(&thread_current()->fd_list, &new_fd->elem, compare_by_fd, NULL);
+		list_insert_ordered(thread_current()->fd_list, &new_fd->elem, compare_by_fd, NULL);
 
 		return new_fd->fd;
 	}
@@ -328,7 +329,7 @@ close (int arg_fd) {
 	struct list_elem * e;
 	struct fd_elem * close_fd = NULL;
 	bool find_fd = false;
-	for (e = list_begin(&curr->fd_list); e != list_end(&curr->fd_list); e = list_next(e)) {
+	for (e = list_begin(curr->fd_list); e != list_end(curr->fd_list); e = list_next(e)) {
 		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
 		if (arg_fd == tmp_fd->fd) { // closing 할 fd 발견!
 			find_fd = true;
@@ -362,7 +363,7 @@ static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, 
 // 찾지 못했을 경우 NULL을 리턴
 static struct file *
 find_file_by_fd (int fd) {
-	for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
+	for (struct list_elem * e = list_begin(thread_current()->fd_list); e != list_end(thread_current()->fd_list); e = list_next(e)) {
 		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
 		if (fd == tmp_fd->fd) { 
 			return tmp_fd->file_ptr;
