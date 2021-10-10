@@ -217,6 +217,7 @@ open(const char * file) {
 	lock_release(&filesys_lock);
 
 	if (open_file == NULL) { 		// file open error
+		// printf("open fail : open file is NULL\n");
 		return -1;
 	} else if(list_size(thread_current()->fd_list) > 130) {
 		lock_acquire(&filesys_lock);

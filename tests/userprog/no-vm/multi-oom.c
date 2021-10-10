@@ -62,6 +62,7 @@ consume_some_resources (void)
 	  }
 #else
 		if (open (test_name) == -1)
+      // printf("open fail : the kernel is low on memory\n");
 		  break;
 #endif
   }
@@ -73,6 +74,7 @@ static int NO_INLINE
 consume_some_resources_and_die (void)
 {
   consume_some_resources ();
+  // printf("not terminated by open fail\n");
   int *KERN_BASE = (int *)0x8004000000;
 
   switch (random_ulong () % 5) {
@@ -107,24 +109,32 @@ make_children (void) {
   int pid;
   char child_name[128];
   for (; ; random_init (i), i++) {
+    // printf("value i start : %d\n", i);
     if (i > EXPECTED_DEPTH_TO_PASS/2) {
       snprintf (child_name, sizeof child_name, "%s_%d_%s", "child", i, "X");
       pid = fork(child_name);
+      // printf("(%d) fork success in if statement %d\n", i, pid);
       if (pid > 0 && wait (pid) != -1) {
         fail ("crashed child should return -1.");
       } else if (pid == 0) {
         consume_some_resources_and_die();
         fail ("Unreachable");
+      } else if (pid == -1) {
+        printf("(%d) pid is -1\n", i);
       }
     }
+    // printf("(%d) escape if statement\n", i);
 
     snprintf (child_name, sizeof child_name, "%s_%d_%s", "child", i, "O");
     pid = fork(child_name);
     if (pid < 0) {
+      // printf("(%d) fork finish\n", i, i);
       exit (i);
     } else if (pid == 0) {
+      // printf("(%d) child %d start\n", i, i);
       consume_some_resources();
     } else {
+      // printf("(%d) parent %d start\n", i, i);
       break;
     }
   }
@@ -147,7 +157,9 @@ main (int argc UNUSED, char *argv[] UNUSED) {
   CHECK (first_run_depth >= EXPECTED_DEPTH_TO_PASS, "Spawned at least %d children.", EXPECTED_DEPTH_TO_PASS);
 
   for (int i = 0; i < EXPECTED_REPETITIONS; i++) {
+    printf("tried %d\n", i);
     int current_run_depth = make_children();
+    printf("tried %d\n", i);
     if (current_run_depth < first_run_depth) {
       fail ("should have forked at least %d times, but %d times forked", 
               first_run_depth, current_run_depth);

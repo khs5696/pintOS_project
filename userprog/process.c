@@ -185,13 +185,15 @@ __do_fork (void *aux) {
       goto error;
 
    process_activate (current);
+
 #ifdef VM
    supplemental_page_table_init (&current->spt);
    if (!supplemental_page_table_copy (&current->spt, &parent->spt))
       goto error;
 #else
-   if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+   if (!pml4_for_each (parent->pml4, duplicate_pte, parent)) {
       goto error;
+   }
 #endif
    /* TODO: Your code goes here.
     * TODO: Hint) To duplicate the file object, use `file_duplicate`
@@ -354,8 +356,6 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
-	process_cleanup ();
-
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
 	while (!list_empty(curr->fd_list)) {
@@ -377,7 +377,10 @@ process_exit (void) {
 	}
 
 	sema_up(&curr->fork_sema);
+	
 	sema_down(&curr->exit_sema);
+	
+	process_cleanup ();
 }
 
 /* Free the current process's resources. */

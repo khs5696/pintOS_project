@@ -1,2 +1,2 @@
 FAIL
-run: TIMEOUT
+run: Should return > 0.: FAILED
