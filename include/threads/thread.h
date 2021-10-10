@@ -128,10 +128,10 @@ struct thread {
 	struct list child_thread_list;			// 현재 프로세스가 fork한 children의 list
 	struct list_elem child_elem;
 
-	struct semaphore waiting_child_sema;	// process_wait() - child의 exit을 확인하기 위해
+	struct semaphore waiting_child_sema;	// process_wait() - child의 exit을 확인하기 위해 (2-7)
 	struct semaphore do_fork_sema;			// fork() - child에서 do_fork의 완료를 확인하기 위해
-	struct semaphore exit_child_sema;		// process_exit() - child에서 exit_status의 전달 완료를 확인하기 위해
-	struct semaphore waiting_load_sema;		// create_initd() - child의 load() 완료를 확인하기 위해
+	struct semaphore exit_child_sema;		// process_exit() - child에서 exit_status의 전달 완료를 확인하기 위해 (2-7)
+	struct semaphore waiting_load_sema;		// create_initd() - child의 load() 완료를 확인하기 위해 (2-6)
 
 	struct thread * parent_thread;			// 현재 프로세스의 부모 스레드
 	struct intr_frame fork_intr;			// fork()를 위한 interrupt 변수

@@ -71,7 +71,7 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	}
 
-	// HS 2-6-1. 생성된 자식 스레드에서 load()를 실행하는 동안 종료되는 경우를 방지
+	// HS 2-6-1. 생성된 child 스레드에서 load()를 실행하는 동안 thread_current()가 종료되는 경우를 방지
 	sema_down(&thread_current()->waiting_load_sema);
 
 	// exit(-1)로 종료된 자식 스레드가 있는 경우 대기
@@ -105,10 +105,11 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
-   /* Clone current thread to new thread.*/
-   tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
+	// HS 2-5-2. thread_create()으로 새로운 child 스레드를 생성
+	// 생성된 child 스레드는 do_fork(thread_current())를 통해 현재 스레드 복제
+	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
    
-	// JH 스레드를 만들기만 하고 다시 돌아옴 thread_create 안에 init_thread에서
+	// JH. 스레드를 만들기만 하고 다시 돌아옴 thread_create 안에 init_thread에서
 	// 현재 스레드의 child_thread_list에 새로 생성하는 thread를 넣는 작업이 있기 때문에
 	// 이게 이루어 지지 않았다면, 현재 스레드의 child_thread_list가 비어있을 것임!
 	if (!list_empty(&thread_current()->child_thread_list)) {
@@ -172,7 +173,8 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
-	/* HS. do_fork 구현 */
+
+	// HS. 2-5-4. __do_fork() : 부모의 page와 파일(fd_list)를 복제
 	// 부모의 인터럽트를 그대로 전달할 경우 변경될 수 있기에, 복사하여 전달
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if = &parent->fork_intr;
@@ -202,7 +204,7 @@ __do_fork (void *aux) {
     * TODO:       in include/filesys/file.h. Note that parent should not return
     * TODO:       from the fork() until this function successfully duplicates
     * TODO:       the resources of parent.*/
-   // HS. 부모 스레드에 저장되어 있는 파일들을 자식 스레드로 복사한다. (file_duplicate() 이용)
+   // 부모 스레드에 저장되어 있는 파일들을 자식 스레드로 복사한다. (file_duplicate() 이용)
 	for (struct list_elem * index_elem = list_begin(parent->fd_list); index_elem != list_end(parent->fd_list); 
 	 index_elem = list_next(index_elem)) {
 		struct fd_elem * file_element = list_entry(index_elem, struct fd_elem, elem);
@@ -223,14 +225,15 @@ __do_fork (void *aux) {
 	}
 
    	process_init ();
-	// 부모 프로세스를 제대로 복제하였음으로, 자신을 그만 기다려도 된다고 신호를 주는 역할
 
+	// HS 2-5-5. 부모 프로세스를 제대로 복제하였음으로, 자신을 그만 기다려도 된다고 신호를 주는 역할
    	sema_up(&current->do_fork_sema);
 	// JH : fork의 제대로된 역할은 부모 프로세스를 그대로 복제하는 자식 프로세스를 만드는 것에서 그쳐야 한다고 생각
 	// 따라서 아래의 do_iret이 실행되면 복제하는 것도 모자라 바로 실행까지 시켜버림으로 그것을 방지하고 복제까지만
 	// 하도록 하기 위한 역할
 	sema_down(&parent->do_fork_sema);
 
+	// HS 2-5-7. do_iret()이 실행되어 인터럽트에 저장되어 있는 부분부터 이어서 실행
 	/* Finally, switch to the newly created process. */
 	if (succ){
 		if_.R.rax = 0;
@@ -238,6 +241,7 @@ __do_fork (void *aux) {
 	}
       
 error:
+	// HS 2-5-8. error case
 	sema_up(&current->do_fork_sema);
 	// fork부터 do_fork 과정 도중에 실패했을 경우, 프로세스를 복제하는데 실패했음을 표시하고
 	// 부모가 이 사실을 알 수 있도록 기다린 후 종료한다.
@@ -347,12 +351,12 @@ process_exec(void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	/* process_wait 구현 */
 	int result;
 	struct list_elem * index_elem;
 	struct thread * child_thread = NULL;
 
-	// HS 2-7-1. child_tid(argument)에 해당하는 자식 스레드를 child_thread_list에서 탐색
+	// HS 2-7-1. process_wait 구현
+	// child_tid(argument)에 해당하는 자식 스레드를 child_thread_list에서 탐색
 	for (index_elem = list_begin(&thread_current()->child_thread_list); index_elem != list_end(&thread_current()->child_thread_list);
 	 index_elem = list_next(index_elem)) {
 		child_thread = list_entry(index_elem, struct thread, child_elem);
@@ -360,7 +364,7 @@ process_wait (tid_t child_tid UNUSED) {
 			// child_thread가 종료되기 전까지는 실행 중인 스레드가 종료되면 안되므로 sema_down()
 			sema_down(&child_thread->waiting_child_sema);
 			
-			// HS 2-7-3. child_thread가 종료되면, exit_status를 받아오고 child_thread_list에서 제거
+			// HS 2-7-5. child_thread가 종료되면, exit_status를 받아오고 child_thread_list에서 제거
 			// child_thread_list에서 제거되었음을 child_thread에게 sema_up()으로 알려준다.
 			result = child_thread->exit_status;
 			list_remove(index_elem);
@@ -400,15 +404,15 @@ process_exit (void) {
 		}
 	}
 
-	// 자식 스레드보다 wait 중인 부모가 먼저 종료되는 것을 방지하기 위해
-	// sema_down()되어 있는 waiting_child_sema를 sema_up
+	// HS 2-7-3. 자식 스레드보다 wait 중인 부모가 먼저 종료되는 것을 방지하기 위해
+	// sema_down()되어 있는 waiting_child_sema를 sema_up()
 	sema_up(&curr->waiting_child_sema);
 
-	// process_wait()에서 부모 스레드에게 exit_status를 전달하기 전까지는
+	// HS 2-7-4. process_wait()에서 부모 스레드에게 exit_status를 전달하기 전까지는
 	// 자식 스레드의 메모리가 삭제되지 않아야하므로 sema_down()
 	sema_down(&curr->exit_child_sema);
 
-	// 스레드의 리소스 정리
+	// HS 2-7-6. 스레드의 리소스 정리
 	process_cleanup ();
 }
 

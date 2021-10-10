@@ -135,17 +135,18 @@ halt (void) {
 	power_off();
 }
 
+// HS 2-7-0. exit() system call
 void
 exit (int status) {
 	thread_current()->exit_status = status;
-	// Process Termination Message 출력
+	// HS 2-3-1. Process Termination Message 출력
 	printf ("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
 
 pid_t
 fork (const char *thread_name) {
-	// process_fork()로 새로운 child 스레드 생성
+	// HS 2-5-1. fork() system call : process_fork()로 새로운 child 스레드 생성
     pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_intr);
 
     if (child_pid == TID_ERROR)			// fork로 새로운 프로세스를 만드는 것에 실패
@@ -165,6 +166,7 @@ fork (const char *thread_name) {
 		if (child_thread == NULL) {		// 만들기는 만들었는데, child_thread_list에서 찾아보니까 없는 경우 -> process_fork가 이상함....
 			return TID_ERROR;
 		} else {
+			// HS 2-5-3. __do_fork()가 실행될 때까지 대기하기 위해 do_fork_sema를 sema_down()
 			// __do_fork()를 실행할 프로세스를 새로 만들었지만, 아직 함수가 실행 되지 않았음으로
 			// __do_fork()를 실행시켜 부모 프로세스를 완전히 복제할 수 있도록 기다려주는 역할
 			sema_down(&child_thread->do_fork_sema);
@@ -175,7 +177,7 @@ fork (const char *thread_name) {
 			if (child_thread->exit_status == -1) {
 				return TID_ERROR;
 			}
-			// 다시 sema_up을 통해 자식이 이후에 정상적으로 do_iret을 할 수 있도록 해주는 역할
+			// HS 2-5-6. 다시 sema_up을 통해 자식이 이후에 정상적으로 do_iret을 할 수 있도록 해주는 역할
 			sema_up(&thread_current()->do_fork_sema);
 		}
     	return child_pid;
@@ -194,6 +196,7 @@ exec (const char * cmd_line) {
 	return exec_result;
 }
 
+// HS 2-7-0. wait() system call
 int wait(tid_t child_tid) {
     return process_wait(child_tid);
 }

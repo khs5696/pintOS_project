@@ -17,7 +17,7 @@ struct fd_elem {
 int current_fd_num;
 struct lock file_synch_lock;
 
-// HS 2-2-2. System call 구햔
+// HS 2-2-2. System call 구현
 void halt(void);
 void exit(int status);
 bool create(const char *file, unsigned initial_size);
