@@ -223,11 +223,13 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 #ifdef USERPROG
+	// HS. 현재 실행 중인 스레드(t->parent_thread())의 child_thread_list에 생성된 child 추가
 	t->parent_thread = thread_current();
-	list_push_back(&thread_current()->child_list, &t->child_elem);
+	list_push_back(&thread_current()->child_thread_list, &t->child_elem);
+
+	// 자식 스레드에 fd_list를 위한 메모리 할당 및 초기화
 	t->fd_list = (struct list *) malloc(sizeof(struct list));
-	if (t->fd_list == NULL)
-		return TID_ERROR;
+	if (t->fd_list == NULL) { return TID_ERROR; }
 	list_init(t->fd_list);
 #endif
 
@@ -502,11 +504,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->recent_cpu = 0;
 
 #ifdef USERPROG
-	list_init(&t->child_list);
-	sema_init(&t->fork_sema, 0);
-	sema_init(&t->load_sema, 0);
-	sema_init(&t->exit_sema, 0);
-	sema_init(&t->start_sema, 0);
+	// HS 2-0-0. Project2를 위한 변수 초기화
+	list_init(&t->child_thread_list);
+
+	sema_init(&t->waiting_child_sema, 0);
+	sema_init(&t->do_fork_sema, 0);
+	sema_init(&t->exit_child_sema, 0);
+	sema_init(&t->waiting_load_sema, 0);
 #endif
 }
 

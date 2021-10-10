@@ -48,17 +48,17 @@ syscall_init (void) {
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
-	lock_init(&filesys_lock);
-	fd_cnt = 3;
+	// HS 2-2-0. System call 구현을 위한 변수 초기화
+	lock_init(&file_synch_lock);
+	current_fd_num = 3;
 }
 
-
+// HS 2-2-1. check_address 함수 구현
 // argument로 주어진 포인터가 유저 메모리 영역(0 ~ KERN_BASE)인지 확인
 // JH 또 user가 전달한 pointer가 mapping 되지 않았을 수도 있음으로 이것도 체크
 // 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
 void check_address (void * addr) {
 	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))	{
-		// printf("not valid address\n");
 		exit(-1);
 	}
 }
@@ -67,8 +67,8 @@ void check_address (void * addr) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	// HS 2-2-1. syscall_handler 구현
-	memcpy(&thread_current()->fork_tf, f, sizeof(struct intr_frame));
+	// HS 2-2-2. syscall_handler 구현
+	memcpy(&thread_current()->fork_intr, f, sizeof(struct intr_frame));
 
 	// 인터럽트 f에서 레지스터에 대한 정보 R을 가져오고, 
 	// 시스템 콜 넘버(f->R.rax)에 해당하는 시스템 콜을 switch문으로 호출
@@ -138,50 +138,45 @@ halt (void) {
 void
 exit (int status) {
 	thread_current()->exit_status = status;
+	// Process Termination Message 출력
 	printf ("%s: exit(%d)\n", thread_current()->name, status);
 	thread_exit();
 }
 
 pid_t
-fork (const char *thread_name) {;
-    pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_tf);
-    if (child_pid == TID_ERROR)
-    	return TID_ERROR;		// fork로 새로운 프로세스를 만드는 것에 실패
-    else {
-    	struct thread * child = NULL;
+fork (const char *thread_name) {
+	// process_fork()로 새로운 child 스레드 생성
+    pid_t child_pid = (pid_t) process_fork(thread_name, &thread_current()->fork_intr);
 
-    	// for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-        // 	child = list_entry(e, struct thread, child_elem);
-        // 	if (child->tid == child_pid) {
-        // 		sema_down(&child->load_sema);
-		// 		//여기서 만약 exit_status가 -1이면 바로 그냥 return TID_ERROR;
-		// 		sema_up(&thread_current()->load_sema);
-        //     	break;
-        // 	}
-    	// }
-		for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-			struct thread * tmp = list_entry(e, struct thread, child_elem);
+    if (child_pid == TID_ERROR)			// fork로 새로운 프로세스를 만드는 것에 실패
+    	return TID_ERROR;		
+    else {
+    	struct thread * child_thread = NULL;
+		struct list_elem * index_elem;
+
+		for (index_elem = list_begin(&thread_current()->child_thread_list); index_elem != list_end(&thread_current()->child_thread_list); 
+		 index_elem = list_next(index_elem)) {
+			struct thread * tmp = list_entry(index_elem, struct thread, child_elem);
 			if (tmp->tid == child_pid) {
-				child = tmp;
+				child_thread = tmp;
 				break;
 			}
 		}
-		if (child == NULL) {		// 만들기는 만들었는데, child_list에서 찾아보니까 없는 경우 -> process_fork가 이상함....
+		if (child_thread == NULL) {		// 만들기는 만들었는데, child_thread_list에서 찾아보니까 없는 경우 -> process_fork가 이상함....
 			return TID_ERROR;
 		} else {
 			// __do_fork()를 실행할 프로세스를 새로 만들었지만, 아직 함수가 실행 되지 않았음으로
 			// __do_fork()를 실행시켜 부모 프로세스를 완전히 복제할 수 있도록 기다려주는 역할
-			sema_down(&child->load_sema);
+			sema_down(&child_thread->do_fork_sema);
 
-			// 자식 프로세스가 'sema_down(&parent->load_sema);'를 실행시킴으로써 user program을 실행시키기 전
-			// 부모에게 주도권을 한번 넘겨준 상황 -> 만약 child가 __do_fork 중 비정상적으로 끝났다면,
+			// 자식 프로세스가 'sema_down(&parent->do_fork_sema);'를 실행시킴으로써 user program을 실행시키기 전
+			// 부모에게 주도권을 한번 넘겨준 상황 -> 만약 child_thread가 __do_fork 중 비정상적으로 끝났다면,
 			// 바로 return TID_ERROR
-			if (child->exit_status == -1) {
+			if (child_thread->exit_status == -1) {
 				return TID_ERROR;
 			}
 			// 다시 sema_up을 통해 자식이 이후에 정상적으로 do_iret을 할 수 있도록 해주는 역할
-			sema_up(&thread_current()->load_sema);
-
+			sema_up(&thread_current()->do_fork_sema);
 		}
     	return child_pid;
 	}
@@ -190,72 +185,71 @@ fork (const char *thread_name) {;
 
 int
 exec (const char * cmd_line) {
-   char * cmd_copy = (char *) malloc(strlen(cmd_line)+1);
-   strlcpy(cmd_copy, cmd_line, strlen(cmd_line)+1);
-   int result = process_exec(cmd_copy);
-   thread_current()->exit_status = result;
-   return result;
+	char * cmd_line_copy = (char *) malloc(strlen(cmd_line)+1);
+	strlcpy(cmd_line_copy, cmd_line, strlen(cmd_line)+1);
+
+	int exec_result = process_exec(cmd_line_copy);
+	thread_current()->exit_status = exec_result;
+
+	return exec_result;
 }
 
 int wait(tid_t child_tid) {
-    /* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-    * XXX:       to add infinite loop here before
-    * XXX:       implementing the process_wait. */
     return process_wait(child_tid);
 }
 
 bool
 create(const char *file, unsigned initial_size) {
-	bool result;
+	bool create_result;
 
-  if (file == NULL)
-    exit(-1);
-	lock_acquire(&filesys_lock);
-	result = filesys_create(file, initial_size);
-	lock_release(&filesys_lock);
-	return result;
+	if (file == NULL) { exit(-1); }		// file name error
+
+	// filesys_create()로 파일을 생성하는 동안, synchronization을 통해 추가적인 접근을 제한한다.
+	lock_acquire(&file_synch_lock);
+	create_result = filesys_create(file, initial_size);
+	lock_release(&file_synch_lock);
+
+	return create_result;
 }
 
 bool
 remove (const char * file) {
-   bool result;
+	bool remove_result;
 
-  if (file == NULL){
-         exit(-1);
-  }
-   lock_acquire(&filesys_lock);
-   result = filesys_remove(file);
-   lock_release(&filesys_lock);
+	if (file == NULL){ exit(-1); }		// file name error
 
-   return result;
+	// filesys_remove()로 파일을 제거하는 동안, synchronization을 통해 추가적인 접근을 제한한다.
+	lock_acquire(&file_synch_lock);
+	remove_result = filesys_remove(file);
+	lock_release(&file_synch_lock);
+
+	return remove_result;
 }
 
 int
 open(const char * file) {
-	if (file == NULL)				// file name error
-		return -1;
+	if (file == NULL) { return -1; }	// file name error
 	
 	// filesys_open()으로 파일을 여는 동안, synchronization을 통해 추가적인 접근을 제한한다.
-	lock_acquire(&filesys_lock);
+	lock_acquire(&file_synch_lock);
 	struct file * open_file = filesys_open(file);
-	lock_release(&filesys_lock);
+	lock_release(&file_synch_lock);
 
-	if (open_file == NULL) { 		// file open error
-		// printf("open fail : open file is NULL\n");
+	if (open_file == NULL) { 			// file open error
 		return -1;
-	} else if(list_size(thread_current()->fd_list) > 130) {
-		lock_acquire(&filesys_lock);
+	} else if (list_size(thread_current()->fd_list) > 130) {
+		lock_acquire(&file_synch_lock);		// Too much file error
 		file_close(open_file);
-		lock_release(&filesys_lock);
+		lock_release(&file_synch_lock);
 		return -1;
-	} else { 						// file open complete!
-		/* fd_list에 추가하기 위해 fd_elem 구조체 생성*/
-		struct fd_elem * new_fd = malloc(sizeof(struct fd_elem));
+	} else { 							// file open complete!
+		/* fd_list에 추가하기 위해 fd_elem 구조체 생성 */
+		struct fd_elem * new_fd_elem = malloc(sizeof(struct fd_elem));
 		
-		// fd를 정하는 과정 - 일단은 fd 계속 증가
-		new_fd->fd = fd_cnt;
-		new_fd->file_ptr = open_file;
-		fd_cnt++;
+		// fd를 정하는 과정. 일단은 fd 계속 증가
+		new_fd_elem->fd = current_fd_num;
+		new_fd_elem->file_ptr = open_file;
+		current_fd_num++;
 		
 		// HS 2-4-1. Deny Write on Executables
 		// 실행 중인 유저 프로그램에 대한 변경을 막기 위해 file_deny_write() 사용
@@ -264,47 +258,44 @@ open(const char * file) {
 			// void file_deny_write (struct file *) 메모리에 프로그램 적재 시(load), 프로그램 파일에 쓰기 권한 제거
 			file_deny_write(open_file);
 	
-		list_insert_ordered(thread_current()->fd_list, &new_fd->elem, compare_by_fd, NULL);
+		list_insert_ordered(thread_current()->fd_list, &new_fd_elem->elem, compare_by_fd, NULL);
 
-		return new_fd->fd;
+		return new_fd_elem->fd;
 	}
 }
 
 int
 filesize (int fd) {
 	struct file * size_check_file_ptr = find_file_by_fd(fd);
+
 	if (size_check_file_ptr != NULL)
 		return file_length(size_check_file_ptr);
 	else
 		exit(-1);
-	// for (struct list_elem * e = list_begin(&thread_current()->fd_list); e != list_end(&thread_current()->fd_list); e = list_next(e)) {
-	// 	struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
-	// 	if (fd == tmp_fd->fd) { // read 할 fd 발견!
-	// 		//Warning : 그냥 read, write 개념이 아니라 값을 찾는거라 lock 안 걸었는데 문제가 되려나...?
-	// 		return file_length(tmp_fd->file_ptr);
-	// 	}
-	// }
-	// exit(-1);
 }
 
 int
 read (int fd, const void *buffer, unsigned size) {
 	int actually_read_byte = 0;
-	
-	if (fd == 0) { 	// STDIN	
-		lock_acquire(&filesys_lock);
+
+	// 파일을 읽는 동안, synchronization을 통해 추가적인 접근을 제한한다.	
+	if (fd == 0) { 					// STDIN	
+		lock_acquire(&file_synch_lock);
 		actually_read_byte = input_getc();
-		lock_release(&filesys_lock);
+		lock_release(&file_synch_lock);
+
 		return actually_read_byte;
 	} else if (fd >= 3) {	
 		struct file * read_file = find_file_by_fd(fd);
+
 		if (read_file != NULL) {
-			lock_acquire(&filesys_lock);
+			lock_acquire(&file_synch_lock);
 			actually_read_byte = file_read(read_file, buffer, size);
-			lock_release(&filesys_lock);
+			lock_release(&file_synch_lock);
 			return actually_read_byte;
-		} else
+		} else {
 			exit(-1);
+		}
 	} else {
 		exit(-1);
 	}
@@ -312,25 +303,25 @@ read (int fd, const void *buffer, unsigned size) {
 
 int 
 write (int fd, const void *buffer, unsigned size) {
-	if (fd == 1) {
-			lock_acquire(&filesys_lock);
-			putbuf(buffer, size);
-			lock_release(&filesys_lock);
-			return size;
+	// 파일을 변경하는 동안, synchronization을 통해 추가적인 접근을 제한한다.
+	if (fd == 1) {					// STDOUT
+		lock_acquire(&file_synch_lock);
+		putbuf(buffer, size);
+		lock_release(&file_synch_lock);
+
+		return size;
 	} else if (fd >= 3) {
 		struct file * write_file = find_file_by_fd(fd);
 		if (write_file != NULL) {
 			int actually_write_byte;
-			lock_acquire(&filesys_lock);
+
+			lock_acquire(&file_synch_lock);
 			actually_write_byte = file_write(write_file, buffer, size);
-			lock_release(&filesys_lock);
+			lock_release(&file_synch_lock);
+
 			return actually_write_byte;
-		} else {  // can't find open file "fd"
-			exit(-1);
-		}
-	} else {
-		exit(-1);
-	}
+		} else { exit(-1); }		 // can't find open file "fd"
+	} else { exit(-1); }
 	NOT_REACHED();
 }
 
@@ -350,26 +341,31 @@ unsigned tell (int fd) {
 // 좋은 이름 추천 받아요
 void
 close (int arg_fd) {
-	struct thread * curr = thread_current();
-	struct list_elem * e;
+	struct list_elem * index_elem;
 	struct fd_elem * close_fd = NULL;
-	bool find_fd = false;
-	for (e = list_begin(curr->fd_list); e != list_end(curr->fd_list); e = list_next(e)) {
-		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
-		if (arg_fd == tmp_fd->fd) { // closing 할 fd 발견!
-			find_fd = true;
+	bool find_fd_success = false;
+
+	// 실행 중인 스레드의 fd_list를 순회하며 arg_fd에 해당하는 closing할 파일을 탐색
+	for (index_elem = list_begin(thread_current()->fd_list); index_elem != list_end(thread_current()->fd_list); 
+			index_elem = list_next(index_elem)) {
+		struct fd_elem * tmp_fd = list_entry(index_elem, struct fd_elem, elem);
+		if (arg_fd == tmp_fd->fd) {
+			find_fd_success = true;
 			close_fd = tmp_fd;
 			break;
 		}
 	}
-	if (find_fd) {
+	if (find_fd_success == true) {
 		// fd_list에서 close 하고자 하는 fd_elem 제거
 		// 얘 때문에 위에 e 선언 for-loop 안으로 제한하면 안됨
-		list_remove(e);
+		list_remove(index_elem);
+
 		// 해당 fd에 연결되어 있는 open file close
-		lock_acquire(&filesys_lock);
+		// 파일을 닫는 동안, synchronization을 통해 추가적인 접근을 제한한다.
+		lock_acquire(&file_synch_lock);
 		file_close(close_fd->file_ptr);
-		lock_release(&filesys_lock);
+		lock_release(&file_synch_lock);
+
 		// malloc()으로 만들어줬던 fd_elem free
 		free(close_fd);
 	} else {
@@ -388,8 +384,12 @@ static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, 
 // 찾지 못했을 경우 NULL을 리턴
 static struct file *
 find_file_by_fd (int fd) {
-	for (struct list_elem * e = list_begin(thread_current()->fd_list); e != list_end(thread_current()->fd_list); e = list_next(e)) {
-		struct fd_elem * tmp_fd = list_entry(e, struct fd_elem, elem);
+	struct list_elem * index_elem;
+
+	for (index_elem = list_begin(thread_current()->fd_list); index_elem != list_end(thread_current()->fd_list); 
+		index_elem = list_next(index_elem)) {
+		struct fd_elem * tmp_fd = list_entry(index_elem, struct fd_elem, elem);
+		
 		if (fd == tmp_fd->fd) { 
 			return tmp_fd->file_ptr;
 		}

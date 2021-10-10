@@ -121,22 +121,20 @@ struct thread {
 	int nice;
 	int recent_cpu;
 
-	int exit_status;
-	// 현재 프로세스가 fork한 children의 list
-	struct list child_list;
+	// HS 2-0-0. project2를 위한 변수
+	int exit_status;						// process_exit() & wait()를 위한 변수
+
+	struct list * fd_list;					// 현재 프로세스가 가지고 있는 fd_elem의 list
+	struct list child_thread_list;			// 현재 프로세스가 fork한 children의 list
 	struct list_elem child_elem;
-	// Parent process의 종료시점을 알리기 위한 semaphore
-	// Parent가 Child를 wait하고자 할 때, Parent에서 Child->fork_sema up
-	// Child에서 exit call이 발생했을 때, curr->fork_sema를 down 해줌으로써 parent unblock
-	struct semaphore fork_sema;
-	struct semaphore load_sema;
-	struct semaphore exit_sema;
-	struct semaphore start_sema;
-	// 이건 왜 필요하지?
-	struct thread * parent_thread;	
-	struct intr_frame fork_tf;
-	// File Descriptor
-	struct list * fd_list;
+
+	struct semaphore waiting_child_sema;	// process_wait() - child의 exit을 확인하기 위해
+	struct semaphore do_fork_sema;			// fork() - child에서 do_fork의 완료를 확인하기 위해
+	struct semaphore exit_child_sema;		// process_exit() - child에서 exit_status의 전달 완료를 확인하기 위해
+	struct semaphore waiting_load_sema;		// create_initd() - child의 load() 완료를 확인하기 위해
+
+	struct thread * parent_thread;			// 현재 프로세스의 부모 스레드
+	struct intr_frame fork_intr;			// fork()를 위한 interrupt 변수
 
 	unsigned magic;                     /* Detects stack overflow. */
 };

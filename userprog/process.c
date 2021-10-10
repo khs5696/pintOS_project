@@ -42,11 +42,12 @@ process_init (void) {
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
-	char *cmd_name;
 	tid_t tid;
-
-	char * ptr;
-	char * next_ptr;
+	
+	// HS 2-1-3. filename 토큰화 관련 변수 선언
+	char * command_name;
+	char * child_thread_name;
+	char * parsing_ptr;
 
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
@@ -55,30 +56,30 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, strlen(file_name)+1);
 
-	cmd_name = palloc_get_page (0);
-	if (cmd_name == NULL)
-		return TID_ERROR;
-	strlcpy (cmd_name, file_name, strlen(file_name)+1);
-
 	// HS 2-1-3. filename 토큰화
-	ptr = strtok_r(cmd_name, " ", &next_ptr);
+	command_name = palloc_get_page (0);
+	if (command_name == NULL)
+		return TID_ERROR;
+	strlcpy (command_name, file_name, strlen(file_name)+1);
+	child_thread_name = strtok_r(command_name, " ", &parsing_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create (ptr, PRI_DEFAULT, initd, fn_copy);
-
-	
-
+	tid = thread_create (child_thread_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR) {
 		palloc_free_page (fn_copy);
-		palloc_free_page (cmd_name);
+		palloc_free_page (command_name);	// 할당된 메모리 해제
 		return TID_ERROR;
 	}
 
-	// HS
-	sema_down(&thread_current()->start_sema);
+	// HS 2-6-1. 생성된 자식 스레드에서 load()를 실행하는 동안 종료되는 경우를 방지
+	sema_down(&thread_current()->waiting_load_sema);
 
-	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-		struct thread * child = list_entry(e, struct thread, child_elem);
-		if (child->exit_status == -1) {
+	// exit(-1)로 종료된 자식 스레드가 있는 경우 대기
+	struct list_elem * index_elem;
+	for (index_elem = list_begin(&thread_current()->child_thread_list); index_elem != list_end(&thread_current()->child_thread_list);
+	 index_elem = list_next(index_elem)) {
+		struct thread * exit_child_thread = list_entry(index_elem, struct thread, child_elem);
+		if (exit_child_thread->exit_status == -1) {
 			return process_wait(tid);
 		}
 	}
@@ -107,15 +108,10 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
    /* Clone current thread to new thread.*/
    tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, thread_current());
    
-//    if (list_empty(&thread_current()->child_list)) {
-//       return 0;      // child process
-//    } else {
-//       return tid;      // parent process
-//    } 
 	// JH 스레드를 만들기만 하고 다시 돌아옴 thread_create 안에 init_thread에서
-	// 현재 스레드의 child_list에 새로 생성하는 thread를 넣는 작업이 있기 때문에
-	// 이게 이루어 지지 않았다면, 현재 스레드의 child_list가 비어있을 것임!
-	if (!list_empty(&thread_current()->child_list)) {
+	// 현재 스레드의 child_thread_list에 새로 생성하는 thread를 넣는 작업이 있기 때문에
+	// 이게 이루어 지지 않았다면, 현재 스레드의 child_thread_list가 비어있을 것임!
+	if (!list_empty(&thread_current()->child_thread_list)) {
 		return tid;
 	} else {
 		return TID_ERROR;
@@ -133,15 +129,18 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	void *newpage;
 	bool writable;
 
+	/* duplicate_pte 구현 - do_fork()에서 page를 복사하기 위해 */
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
-	if (is_kernel_vaddr(va)) {
-		return true;
-	}
+	// 커널 영역을 가리키는 경우, 추가적인 작업 없이 return
+	if (is_kernel_vaddr(va)) { return true; }
+
 	/* 2. Resolve VA from the parent's page map level 4. */
+	// 부모 스레드의 pml4에서 va에 해당하는 영역(페이지)를 불러온다.
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	// 자식 스레드에 pml4를 복사하기 위해 새로운 페이지 할당
 	newpage = palloc_get_page(PAL_USER);
 	if (!newpage)
 		return false;
@@ -149,6 +148,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	// 부모 스레드의 pml4에서 불러온 pte를 자식 스레드에게 복사
 	memcpy(newpage, parent_page, PGSIZE);
 	writable = is_writable(pte);
 
@@ -172,8 +172,10 @@ __do_fork (void *aux) {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
+	/* HS. do_fork 구현 */
+	// 부모의 인터럽트를 그대로 전달할 경우 변경될 수 있기에, 복사하여 전달
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->fork_tf;
+	struct intr_frame *parent_if = &parent->fork_intr;
 	bool succ = true;
 	
 	/* 1. Read the cpu context to local stack. */
@@ -200,14 +202,21 @@ __do_fork (void *aux) {
     * TODO:       in include/filesys/file.h. Note that parent should not return
     * TODO:       from the fork() until this function successfully duplicates
     * TODO:       the resources of parent.*/
-	for (struct list_elem * e = list_begin(parent->fd_list); e != list_end(parent->fd_list); e = list_next(e)) {
-		struct fd_elem * file_element = list_entry(e, struct fd_elem, elem);
+   // HS. 부모 스레드에 저장되어 있는 파일들을 자식 스레드로 복사한다. (file_duplicate() 이용)
+	for (struct list_elem * index_elem = list_begin(parent->fd_list); index_elem != list_end(parent->fd_list); 
+	 index_elem = list_next(index_elem)) {
+		struct fd_elem * file_element = list_entry(index_elem, struct fd_elem, elem);
 		struct file * new_file_element = file_duplicate(file_element->file_ptr);
-		if (new_file_element == NULL)
+
+		if (new_file_element == NULL)		// file_duplicate error
 			goto error;
+		
+		// 자식 스레드의 fd_list에 추가하기 위해 fd_elem 구조체 선언 및 변수 할당
 		struct fd_elem * new_elem = (struct fd_elem *) malloc(sizeof(struct fd_elem));
+
 		if (new_elem == NULL)
 			goto error;
+		
 		new_elem->file_ptr = new_file_element;
 		new_elem->fd = file_element->fd;
 		list_push_back(current->fd_list, &new_elem->elem);
@@ -215,11 +224,12 @@ __do_fork (void *aux) {
 
    	process_init ();
 	// 부모 프로세스를 제대로 복제하였음으로, 자신을 그만 기다려도 된다고 신호를 주는 역할
-   	sema_up(&current->load_sema);
+
+   	sema_up(&current->do_fork_sema);
 	// JH : fork의 제대로된 역할은 부모 프로세스를 그대로 복제하는 자식 프로세스를 만드는 것에서 그쳐야 한다고 생각
 	// 따라서 아래의 do_iret이 실행되면 복제하는 것도 모자라 바로 실행까지 시켜버림으로 그것을 방지하고 복제까지만
 	// 하도록 하기 위한 역할
-	sema_down(&parent->load_sema);
+	sema_down(&parent->do_fork_sema);
 
 	/* Finally, switch to the newly created process. */
 	if (succ){
@@ -228,11 +238,11 @@ __do_fork (void *aux) {
 	}
       
 error:
-	sema_up(&current->load_sema);
-	// 중간에 실패했을 경우, 프로세스를 복제하는데 실패했음을 표시하고,
-	// 부모가 이 사실을 알 수 있도록 기다림.
+	sema_up(&current->do_fork_sema);
+	// fork부터 do_fork 과정 도중에 실패했을 경우, 프로세스를 복제하는데 실패했음을 표시하고
+	// 부모가 이 사실을 알 수 있도록 기다린 후 종료한다.
 	thread_current()->exit_status = -1;
-	sema_down(&parent->load_sema);
+	sema_down(&parent->do_fork_sema);
 	
    	thread_exit ();
 }
@@ -255,6 +265,7 @@ process_exec(void *f_name) {
 	char *command_address[50];		// stack에서의 각 token 주소(포인터)를 저장할 배열
 
 	/* HS 2-1-1. Command Parsing */
+	// f_name을 parsing하여 토큰화시키고 argv[argc]에 순서대로 저장
 	/*Warning: cannot use f_name anymore since strtok_r is used to f_name*/
 	parsing_token = strtok_r(f_name, " ", &next_token);
 	argv[argc] = parsing_token;
@@ -279,8 +290,9 @@ process_exec(void *f_name) {
 	success = load(argv[0], &_if);
 	/* If load failed, quit. */
 
-	// HS
-	sema_up(&thread_current()->parent_thread->start_sema);
+	// HS 2-6-2. 자식 스레드가 load() 하는 동안 부모 스레드(initd)가 종료되는 경우를 방지하기 위해
+	// create_initd()에서 대기 중인 waiting_load_sema를 sema_up
+	sema_up(&thread_current()->parent_thread->waiting_load_sema);
 
 	if (!success)
 		return -1;
@@ -291,9 +303,9 @@ process_exec(void *f_name) {
 	for (int i = argc - 1; i > -1; i--) {
 		length = strlen(argv[i]) + 1;				// '\0'도 포함 
 		command_len += length;						// alignment를 위해 command_len 업데이트
-		_if.rsp = (char *)_if.rsp - length;		// token의 크기만큼 rsp(stack pointer) 이동
+		_if.rsp = (char *)_if.rsp - length;			// token의 크기만큼 rsp(stack pointer) 이동
 		memcpy (_if.rsp, argv[i], length);			// rsp에 token을 복사
-		command_address[i] = (char *) _if.rsp;	// 각 token의 주소를 배열에 저장
+		command_address[i] = (char *) _if.rsp;		// 각 token의 주소를 배열에 저장
 	}
 	// Alignment를 위해 padding 영역만큼 rsp 이동
 	if ((command_len % sizeof(uintptr_t)) != 0) {	
@@ -301,10 +313,10 @@ process_exec(void *f_name) {
 		_if.rsp = (char *)_if.rsp - align_padding;
 	}
 
-	// 0 삽입 & token의 주소들을 순서대로 stack에 삽입
+	// 0을 stack에 삽입 & token의 주소들을 순서대로 stack에 삽입
 	_if.rsp = (char *)_if.rsp - sizeof(char *);
 	*(uint64_t *) _if.rsp = 0;
-	for (int i = argc-1; i > -1; i--) {
+	for (int i = argc - 1; i > -1; i--) {
 		_if.rsp = (char *)_if.rsp - sizeof(char *);
 		*(uint64_t *) _if.rsp = command_address[i];
 	}
@@ -316,7 +328,7 @@ process_exec(void *f_name) {
 	_if.R.rdi = argc;
 	_if.R.rsi = (uintptr_t *)_if.rsp + 1;
 
-	//hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -335,19 +347,25 @@ process_exec(void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	struct thread * child = NULL;
+	/* process_wait 구현 */
+	int result;
+	struct list_elem * index_elem;
+	struct thread * child_thread = NULL;
 
-	// child_tid에 해당하는 자식 스레드를 child_list에서 탐색
-	for (struct list_elem * e = list_begin(&thread_current()->child_list); e != list_end(&thread_current()->child_list); e = list_next(e)) {
-		child = list_entry(e, struct thread, child_elem);
-		if (child->tid == child_tid) {
-			sema_down(&child->fork_sema);
-			int result = child->exit_status;
-			list_remove(e);
-			sema_up(&child->exit_sema);
+	// HS 2-7-1. child_tid(argument)에 해당하는 자식 스레드를 child_thread_list에서 탐색
+	for (index_elem = list_begin(&thread_current()->child_thread_list); index_elem != list_end(&thread_current()->child_thread_list);
+	 index_elem = list_next(index_elem)) {
+		child_thread = list_entry(index_elem, struct thread, child_elem);
+		if (child_thread->tid == child_tid) {
+			// child_thread가 종료되기 전까지는 실행 중인 스레드가 종료되면 안되므로 sema_down()
+			sema_down(&child_thread->waiting_child_sema);
+			
+			// HS 2-7-3. child_thread가 종료되면, exit_status를 받아오고 child_thread_list에서 제거
+			// child_thread_list에서 제거되었음을 child_thread에게 sema_up()으로 알려준다.
+			result = child_thread->exit_status;
+			list_remove(index_elem);
+			sema_up(&child_thread->exit_child_sema);
+			
 			return result;
 		}
 	}
@@ -358,33 +376,39 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread *curr = thread_current ();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// HS 2-7-2. process_exit 구현
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
 	while (!list_empty(curr->fd_list)) {
 		struct fd_elem * tmp = list_entry(list_pop_front(curr->fd_list), struct fd_elem, elem);
-		lock_acquire(&filesys_lock);
+
+		// 파일을 닫는 동안, 추가적인 접근을 통제하기 위해 synchronization
+		lock_acquire(&file_synch_lock);
 		file_close(tmp->file_ptr);
-		lock_release(&filesys_lock);
+		lock_release(&file_synch_lock);
 		free(tmp);
 	}
 
 	free(curr->fd_list);
 
-	// child_list의 자식 스레드들과의 연결을 끊어준다.
-	while (!list_empty(&curr->child_list)) {
-		struct thread * tmp = list_entry(list_pop_front(&curr->child_list), struct thread, child_elem);
+	// child_thread_list의 자식 스레드들과의 연결을 끊어준다. Orphan
+	while (!list_empty(&curr->child_thread_list)) {
+		struct thread * tmp = list_entry(list_pop_front(&curr->child_thread_list), struct thread, child_elem);
 		if (tmp->parent_thread == curr) {
 				tmp->parent_thread = NULL;
 		}
 	}
 
-	sema_up(&curr->fork_sema);
-	sema_down(&curr->exit_sema);
+	// 자식 스레드보다 wait 중인 부모가 먼저 종료되는 것을 방지하기 위해
+	// sema_down()되어 있는 waiting_child_sema를 sema_up
+	sema_up(&curr->waiting_child_sema);
+
+	// process_wait()에서 부모 스레드에게 exit_status를 전달하기 전까지는
+	// 자식 스레드의 메모리가 삭제되지 않아야하므로 sema_down()
+	sema_down(&curr->exit_child_sema);
+
+	// 스레드의 리소스 정리
 	process_cleanup ();
 }
 
