@@ -782,6 +782,10 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+
+	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
+	// uninit.c의 uniuninit_initialize()에서 호출
+	
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -813,6 +817,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
+		/* HS 3-1-2. lazy_loading을 위해 load_segment() 구현 */
+		// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
+		// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
+		// malloc으로 spt에 삽입할 page 구조체 생성
+
+		// vm_alloc_page_with_initializer()에 사용될 argument AUX를 준비
+		// page fault가 발생하여 데이터를 로드할 때 파일의 offset / size / 패딩할 zero_byte etc.
+
 		void *aux = NULL;
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
 					writable, lazy_load_segment, aux))
@@ -822,6 +834,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+
+		// 가상 메모리가 page 기반으로 변경되었기 때문에 ofs를 업데이트
+		ofs += page_read_bytes
 	}
 	return true;
 }
@@ -836,6 +851,11 @@ setup_stack (struct intr_frame *if_) {
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
+
+	/* HS 3-1-4. lazy_loading을 위해 setup_stack() 수정 */
+	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
+	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
+	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 보조 마커를 활용 가능
 
 	return success;
 }

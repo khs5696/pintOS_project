@@ -16,6 +16,11 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+
+	/* HS 3-1-1. supplemental page table(hash table) 초기화 */
+	// 새로운 프로세스가 시작 (initd) 되거나 fork (__do_fork) 될 때 호출
+	// supplemental_page_table_init (struct supplemental_page_table *spt)
+
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -55,6 +60,22 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		/* TODO: Insert the page into the spt. */
+		/* HS 3-1-3. page(VM_UNINIT) 생성 및 spt에 삽입 */
+		// process.c의 Load_segment()에서 호출
+		// vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, aux)
+		
+		// malloc을 사용해 새로운 page를 할당
+		
+		// vm_type에 맞는 initializer을 준비
+
+		// uninit_new()를 통해 page 구조체를 uninit 상태로 변경(초기화)
+		// uninit_new (struct page *page, void *va, vm_initializer *init,
+		//		enum vm_type type, void *aux,
+		//		bool (*initializer)(struct page *, enum vm_type, void *))
+
+		// spt(hash table)에 생성된 page를 삽입
+		// bool spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED)
+
 	}
 err:
 	return false;
@@ -65,7 +86,9 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
-
+	/* HS 3-1-5. */
+	// supplemental page table에서 va에 해당하는 struct page 탐색
+	// struct hash_elem *hash_find (struct hash *, struct hash_elem *)
 	return page;
 }
 
@@ -75,6 +98,9 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
+	/* HS 3-1-3. page(VM_UNINIT) 생성 및 spt에 삽입 */
+	// 해당 virtual address가 이미 존재하고 있는지를 확인해야한다
+	// struct hash_elem *hash_insert (struct hash *, struct hash_elem *)
 
 	return succ;
 }
@@ -112,6 +138,8 @@ static struct frame *
 vm_get_frame (void) {
 	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	/* HS 3-2-2. 물리 메모리 할당 */
+	// vm_do_claim_page()에서 호출되어, palloc_get_page()로 물리 메모리 할당
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -136,6 +164,13 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
+	/* HS 3-2-1. 메모리 접근 및 page fault */
+	// exception.c의 page_fault()에 의해 호출
+	// vm_try_handle_fault (f, fault_addr, user, write, not_present)
+	// not_present를 참조하여 read only 페이지에 대한 접근인지 확인(???)
+
+	// 해당 fault가 유효한 page fault인지 확인 (lazy loading fault)
+	// page fault가 발생한 주소(va)에 대한 page를 탐색 -> spt_find_page() 이용
 
 	return vm_do_claim_page (page);
 }
@@ -167,13 +202,23 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
+	/* HS 3-2-3. 물리 메모리와의 mapping을 page table에 삽입 */
 
+	// 물리메모리에 데이터 적재가 완료되면 pate table에서 mapping
+
+	// swap_in : 페이지의 타입이 uninit이므로 uninit_initialize(page, frame->kva) 호출
+	// 페이지 타입에 따라 페이지를 초기화하고 
+	// lazy_load_segment()를 호출해 disk에 있는 file을 물리메모리로 로드
 	return swap_in (page, frame->kva);
 }
 
 /* Initialize new supplemental page table */
 void
 supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
+	/* HS 3-1-1. supplemental page table(hash table) 초기화 (한양대 자료 p.300 참고) */
+	// bool hash_init (struct hash * h ,hash_hash_func *, hash_less_func *, void *aux)
+	// hash_hash_func : hash 값을 구해주는 함수의 포인터
+	// hash_less_func : hash element 들의 크기를 비교해주는 함수의 포인터 -> hash_find()에서 사용
 }
 
 /* Copy supplemental page table from src to dst */

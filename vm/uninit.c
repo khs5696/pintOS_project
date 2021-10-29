@@ -52,6 +52,10 @@ uninit_initialize (struct page *page, void *kva) {
 	void *aux = uninit->aux;
 
 	/* TODO: You may need to fix this function. */
+	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
+	// vm_do_claim_page()에서 호출		swap_in (page, frame->kva)
+	// 변수 init에는 vm_alloc_page_with_initializer()에 의해 lazy_load_segment() 존재
+	// 변수 page_initializer에는 페이지 타입에 맞는 initializer 존재
 	return uninit->page_initializer (page, uninit->type, kva) &&
 		(init ? init (page, aux) : true);
 }
