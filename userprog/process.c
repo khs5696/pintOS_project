@@ -785,7 +785,17 @@ lazy_load_segment (struct page *page, void *aux) {
 
 	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
-	
+	uint8_t* kpage = (page->frame)->kva;
+
+	struct page_info * new_page_info = page->uninit.aux;
+
+	file_seek(new_page_info->file, new_page_info->ofs); 	//? file->pos update
+	if (file_read (new_page_info->file, kpage, new_page_info->read_bytes) != (int) new_page_info->read_bytes) {
+		palloc_free_page (kpage);
+		return false;
+	}
+	memset(kpage + new_page_info->read_bytes, 0, new_page_info->zero_bytes);
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -824,10 +834,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		// vm_alloc_page_with_initializer()에 사용될 argument AUX를 준비
 		// page fault가 발생하여 데이터를 로드할 때 파일의 offset / size / 패딩할 zero_byte etc.
+		// 정보를 담아줄 구조체를 process.h에 새로 선언
+		struct page_info * page_info_aux = (struct page_info *) 	malloc(sizeof(struct page_info));
+		page_info_aux->file = file;
+		page_info_aux->ofs = ofs;
+		page_info_aux->read_bytes = page_read_bytes;
+		page_info_aux->zero_bytes = page_zero_bytes;
 
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage, writable, lazy_load_segment, page_info_aux))
 			return false;
 
 		/* Advance. */
@@ -836,7 +850,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		upage += PGSIZE;
 
 		// 가상 메모리가 page 기반으로 변경되었기 때문에 ofs를 업데이트
-		ofs += page_read_bytes
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -853,10 +867,28 @@ setup_stack (struct intr_frame *if_) {
 	/* TODO: Your code goes here */
 
 	/* HS 3-1-4. lazy_loading을 위해 setup_stack() 수정 */
-	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
-	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
+	// 초기에 스택영역을 초기화해주는 과정
 	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 보조 마커를 활용 가능
+	// if(! (vm_alloc_page (VM_ANON|VM_STACK, stack_bottom, 1) && vm_claim_page(stack_bottom))) {
 
-	return success;
+	// 기존 구현 내용
+	// kpage에 페이지 1개를 할당 받고 install_page()를 이용해 pml4에 kpage와의 mapping을 추가
+
+	// page 구조체 생성
+	struct page * new_page = palloc_get_page(PAL_USER);
+
+	// page 멤버들 설정
+	new_age
+
+	// spt_insert_page()로 해시테이블에 추가
+
+	if(! (vm_alloc_page (VM_ANON, stack_bottom, 1) && vm_claim_page(stack_bottom))) {
+		struct page *page = spt_find_page(&thread_current()->spt,stack_bottom);
+		palloc_free_page(page);
+		PANIC("vm_alloc_page failed");
+	}		
+	memset(stack_bottom,0,PGSIZE);
+	if_->rsp = USER_STACK;
+	return true;
 }
 #endif /* VM */

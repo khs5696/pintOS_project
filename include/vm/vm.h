@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "lib/kernel/hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -46,6 +47,10 @@ struct page {
 	struct frame *frame;   /* Back reference for frame */
 
 	/* Your implementation */
+	/* HS 3-1-0. supplemental page table 구현을 위한 변수 선언 */
+	bool writable;
+	struct hash_elem hash_elem;
+	enum vm_type vm_type;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -86,7 +91,7 @@ struct page_operations {
  * All designs up to you for this. */
 struct supplemental_page_table {
 	/* HS 3-1-0. supplemental page table 자료 구조 선언 (hash table) */
-	struct hash spt_hash;
+	struct hash spt_table;
 };
 
 #include "threads/thread.h"
