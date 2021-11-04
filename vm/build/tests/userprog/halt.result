@@ -1,2 +1,32 @@
 FAIL
+<<<<<<< HEAD
 missing 'begin' message
+=======
+Kernel panic in run: PANIC at ../../threads/thread.c:305 in thread_current(): assertion `is_thread (t)' failed.
+Call stack: 0x80042188bf 0x8004207265 0x8004221c8e 0x800421d75c 0x800420980d 0x8004209c2b 0x8004221d08 0x800421d75c 0x800420980d 0x8004209c2b 0x8004221d08 0x800421d75c 0x800420980d 0x8004209c2b 0x8004221d08 0x800421d75c 0x800420980d 0x8004209c2b 0x8004221929 0x800421d185 0x800421cd75 0x800421c507 0x800421c07e 0x8004207701
+Translation of call stack:
+0x00000080042188bf: debug_panic (lib/kernel/debug.c:32)
+0x0000008004207265: thread_current (threads/thread.c:306)
+0x0000008004221c8e: vm_try_handle_fault (vm/vm.c:225)
+0x000000800421d75c: page_fault (userprog/exception.c:141)
+0x000000800420980d: intr_handler (threads/interrupt.c:352)
+0x0000008004209c2b: intr_entry (threads/intr-stubs.o:?)
+0x0000008004221d08: vm_try_handle_fault (vm/vm.c:230 (discriminator 4))
+0x000000800421d75c: page_fault (userprog/exception.c:141)
+0x000000800420980d: intr_handler (threads/interrupt.c:352)
+0x0000008004209c2b: intr_entry (threads/intr-stubs.o:?)
+0x0000008004221d08: vm_try_handle_fault (vm/vm.c:230 (discriminator 4))
+0x000000800421d75c: page_fault (userprog/exception.c:141)
+0x000000800420980d: intr_handler (threads/interrupt.c:352)
+0x0000008004209c2b: intr_entry (threads/intr-stubs.o:?)
+0x0000008004221d08: vm_try_handle_fault (vm/vm.c:230 (discriminator 4))
+0x000000800421d75c: page_fault (userprog/exception.c:141)
+0x000000800420980d: intr_handler (threads/interrupt.c:352)
+0x0000008004209c2b: intr_entry (threads/intr-stubs.o:?)
+0x0000008004221929: vm_alloc_page_with_initializer (vm/vm.c:61)
+0x000000800421d185: load_segment (userprog/process.c:844)
+0x000000800421cd75: load (userprog/process.c:603)
+0x000000800421c507: process_exec (userprog/process.c:294)
+0x000000800421c07e: initd (userprog/process.c:99)
+0x0000008004207701: kernel_thread (threads/thread.c:478)
+>>>>>>> 495be6709a42498f0602cfa588c14c9965fb0c71
