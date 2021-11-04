@@ -3,6 +3,13 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/thread.h"
+#include "list.h"
+#include "threads/palloc.h"
+#include <hash.h>
+#include "threads/mmu.h"
+#include <stdio.h>
+#include "userprog/process.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -75,34 +82,74 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		// spt(hash table)에 생성된 page를 삽입
 		// bool spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED)
+		struct page* page = (struct page*)malloc(sizeof(struct page));
+		ASSERT(page);
 
+		bool (*initializer)(struct page *, enum vm_type, void *);
+		switch(VM_TYPE(type)){
+			case VM_ANON:
+				initializer = anon_initializer;
+				break;
+			case VM_FILE:
+				initializer = file_backed_initializer;			
+				break;
+			default:
+				PANIC("###### vm_alloc_page_with_initializer [unvalid type] ######");
+				break;
+		}
+
+		uninit_new(page, upage, init, type, aux, initializer);
+		
+		// printf("file length 2 %d\n", file_length(((struct load_args *)aux)->file));
+		page->writable = writable;
+		page->vm_type = type;
+
+		/* TODO: Insert the page into the spt. */
+		if(spt_insert_page(spt, page))
+			return true;
 	}
 err:
 	return false;
 }
 
+
+/* Returns the page containing the given virtual address, 
+or a null pointer if no such page exists. */
+struct page *
+page_lookup (const void *address) {
+  struct page p;
+  struct hash_elem *e;
+
+  p.va = address;
+  e = hash_find (&thread_current()->spt.hash_table, &p.hash_elem);
+  return e != NULL ? hash_entry (e, struct page, hash_elem) : NULL;
+}
+
 /* Find VA from spt and return page. On error, return NULL. */
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct page *page = NULL;
+	// struct page *page = NULL;
 	/* TODO: Fill this function. */
 	/* HS 3-1-5. */
 	// supplemental page table에서 va에 해당하는 struct page 탐색
 	// struct hash_elem *hash_find (struct hash *, struct hash_elem *)
-	return page;
+	// return page;
+	
+	return page_lookup(pg_round_down(va));
 }
 
 /* Insert PAGE into spt with validation. */
 bool
 spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
-	int succ = false;
+	// int succ = false;
 	/* TODO: Fill this function. */
 	/* HS 3-1-3. page(VM_UNINIT) 생성 및 spt에 삽입 */
 	// 해당 virtual address가 이미 존재하고 있는지를 확인해야한다
 	// struct hash_elem *hash_insert (struct hash *, struct hash_elem *)
-
-	return succ;
+	if(hash_insert(&spt->hash_table, &page->hash_elem) == NULL)
+		return true;
+	return false;
 }
 
 void
@@ -140,6 +187,19 @@ vm_get_frame (void) {
 	/* TODO: Fill this function. */
 	/* HS 3-2-2. 물리 메모리 할당 */
 	// vm_do_claim_page()에서 호출되어, palloc_get_page()로 물리 메모리 할당
+	void* p = palloc_get_page(PAL_USER);
+	if(p == NULL)
+		// printf("p is null\n");
+		return vm_evict_frame();
+
+	frame = (struct frame*)malloc(sizeof(struct frame));
+	printf("hello\n");
+	printf("frame %d\n", p);
+	if (frame == NULL) 
+		PANIC("failed to allocate frame");
+	
+	frame->kva = p;
+	frame->page = NULL;
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -160,8 +220,8 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	struct page *page = NULL;
+	// struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+	// struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	/* HS 3-2-1. 메모리 접근 및 page fault */
@@ -172,7 +232,34 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	// 해당 fault가 유효한 page fault인지 확인 (lazy loading fault)
 	// page fault가 발생한 주소(va)에 대한 page를 탐색 -> spt_find_page() 이용
 
-	return vm_do_claim_page (page);
+	// return vm_do_claim_page (page);
+	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
+	if(is_kernel_vaddr(addr))
+    return false;
+
+	void *rsp = is_kernel_vaddr(f->rsp) ? thread_current()->save_rsp : f->rsp;
+	struct page *page = spt_find_page(spt,addr);
+
+	if(page){
+		if (page->writable == 0 && write) {
+			// printf("page writable false\n");
+			return false;
+		}
+		// printf("it's okay\n");
+		return vm_do_claim_page (page);
+	}
+	else{
+		// printf("not page\n");
+		if(is_kernel_vaddr(f->rsp) && thread_current()->save_rsp){
+			rsp = thread_current()->save_rsp;
+		}
+
+		// if(user && write && addr > (USER_STACK - (1<<20)) && (int)addr >= ((int)rsp)-32 && addr < USER_STACK){
+		// 	vm_stack_growth(addr);
+		// 	return true;
+		// }
+		return false;
+	}
 }
 
 /* Free the page.
@@ -186,9 +273,10 @@ vm_dealloc_page (struct page *page) {
 /* Claim the page that allocate on VA. */
 bool
 vm_claim_page (void *va UNUSED) {
-	struct page *page = NULL;
+	// struct page *page = NULL;
 	/* TODO: Fill this function */
-
+	struct page *page = spt_find_page(&thread_current()->spt,va);
+	ASSERT(page);
 	return vm_do_claim_page (page);
 }
 
@@ -196,6 +284,12 @@ vm_claim_page (void *va UNUSED) {
 static bool
 vm_do_claim_page (struct page *page) {
 	struct frame *frame = vm_get_frame ();
+	if (frame == NULL) {
+		// printf("frame is NULL\n");
+	}
+	
+	// struct load_args* args = page->uninit.aux;
+	// printf("file length 2 %d\n", file_length(args->file));
 
 	/* Set links */
 	frame->page = page;
@@ -205,12 +299,41 @@ vm_do_claim_page (struct page *page) {
 	/* HS 3-2-3. 물리 메모리와의 mapping을 page table에 삽입 */
 
 	// 물리메모리에 데이터 적재가 완료되면 pate table에서 mapping
-
+	bool writable = page->writable;
+	int check = pml4_set_page(thread_current()->pml4, page->va, frame->kva, writable);
+	// printf("plm4 success\n");
 	// swap_in : 페이지의 타입이 uninit이므로 uninit_initialize(page, frame->kva) 호출
 	// 페이지 타입에 따라 페이지를 초기화하고 
 	// lazy_load_segment()를 호출해 disk에 있는 file을 물리메모리로 로드
-	return swap_in (page, frame->kva);
+	// list_push_back (&victim_table, &page->victim_elem);
+	// printf("vm_type : %d\n", page->operations->type);
+	bool result = swap_in (page, frame->kva);
+	if (result) {
+		// printf("swap success\n");
+	}
+	return result;
 }
+
+// HS 추가
+/* Computes and returns the hash value for hash element E, given
+ * auxiliary data AUX. */
+uint64_t page_hash (const struct hash_elem *e, void *aux){
+	const struct page* p = hash_entry(e, struct page, hash_elem);
+	return hash_bytes(&p->va, sizeof(p->va));
+}
+
+/* Compares the value of two hash elements A and B, given
+ * auxiliary data AUX.  Returns true if A is less than B, or
+ * false if A is greater than or equal to B. */
+bool page_less (const struct hash_elem *a,
+		const struct hash_elem *b,
+		void *aux){
+	struct page* page_a = hash_entry(a, struct page, hash_elem);
+	struct page* page_b = hash_entry(b, struct page, hash_elem);
+
+	return page_a->va < page_b->va;
+}
+
 
 /* Initialize new supplemental page table */
 void
@@ -219,6 +342,7 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 	// bool hash_init (struct hash * h ,hash_hash_func *, hash_less_func *, void *aux)
 	// hash_hash_func : hash 값을 구해주는 함수의 포인터
 	// hash_less_func : hash element 들의 크기를 비교해주는 함수의 포인터 -> hash_find()에서 사용
+	hash_init(&spt->hash_table, page_hash, page_less, NULL);
 }
 
 /* Copy supplemental page table from src to dst */
@@ -227,9 +351,17 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
 }
 
+void supplemental_page_table_destructor(struct hash_elem *e, void *aux){
+	struct page* p = hash_entry(e, struct page, hash_elem);
+	vm_dealloc_page(p);
+}
+
 /* Free the resource hold by the supplemental page table */
 void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
-	 * TODO: writeback all the modified contents to the storage. */
+	 * TODO: writeback all the modified contents to thmake
+	 e storage. */
+	struct hash *h = &spt->hash_table;
+	hash_destroy(h, supplemental_page_table_destructor);
 }

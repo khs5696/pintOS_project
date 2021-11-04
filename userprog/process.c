@@ -290,6 +290,11 @@ process_exec(void *f_name) {
 
 	/* We first kill the current context */
 	process_cleanup();
+
+// HS 3-1-1
+#ifdef VM
+   	supplemental_page_table_init(&thread_current()->spt);
+#endif
 	/* And then load the binary */
 	success = load(argv[0], &_if);
 	/* If load failed, quit. */
@@ -785,7 +790,30 @@ lazy_load_segment (struct page *page, void *aux) {
 
 	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
-	
+	uint8_t* kpage = (page->frame)->kva;
+	uint8_t* upage = page->va;
+	struct load_args* args = page->uninit.aux;
+	// if (args->file == NULL) {
+	// 	printf('no file\n');
+	// }
+	// if (args->ofs == NULL) {
+	// 	printf('ofs\n');
+	// }
+	// printf("ofs %d\n", (int) args->ofs);
+	file_seek(args->file, args->ofs); //? file->pos update
+	// printf("file length %d\n", file_length(args->file));
+	printf("file length 3 %d\n", file_length(((struct load_args *)args)->file));
+	int read_byte = file_read (((struct load_args *)args)->file, kpage, args->read_bytes);
+	printf("a %d\n", read_byte);
+	printf("c %d\n", kpage);
+	printf("b %d\n", (int) args->read_bytes);
+	if (read_byte != (int) args->read_bytes) {
+		// printf("lazy fail\n");
+		palloc_free_page (kpage);
+		return false;
+	}
+	memset(kpage + args->read_bytes, 0, args->zero_bytes);
+	return true;
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -805,6 +833,7 @@ lazy_load_segment (struct page *page, void *aux) {
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+	// printf("read_byte first : %d\n", read_bytes);
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
@@ -824,10 +853,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		// vm_alloc_page_with_initializer()에 사용될 argument AUX를 준비
 		// page fault가 발생하여 데이터를 로드할 때 파일의 offset / size / 패딩할 zero_byte etc.
-
-		void *aux = NULL;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+		struct load_args* args = (struct load_args*)malloc(sizeof(struct load_args));
+		args->file = file;
+		printf("file length 0 %d\n", file_length(args->file));
+		args->ofs = ofs;
+		// printf("first %d\n", (int) ofs);
+		// printf("second %d\n", (int) args->ofs);
+		args->read_bytes = page_read_bytes;
+		// printf("first %d\n", (int) page_read_bytes);
+		// printf("second %d\n", (int) args->read_bytes);
+		args->zero_bytes = page_zero_bytes;
+		// printf("first %d\n", (int) page_zero_bytes);
+		// printf("second %d\n", (int) args->zero_bytes);
+		args->read_bytes_sum = read_bytes;
+		// printf("first %d\n", (int) read_bytes);
+		// printf("second %d\n", (int) args->read_bytes_sum);
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage,   //?왜 VM_ANON만 설정해놓는걸까? 
+					writable, lazy_load_segment, args))
 			return false;
 
 		/* Advance. */
@@ -836,7 +878,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		upage += PGSIZE;
 
 		// 가상 메모리가 page 기반으로 변경되었기 때문에 ofs를 업데이트
-		ofs += page_read_bytes
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -856,7 +898,14 @@ setup_stack (struct intr_frame *if_) {
 	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
 	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
 	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 보조 마커를 활용 가능
-
-	return success;
+	if(! (vm_alloc_page (VM_ANON|VM_STACK, stack_bottom, 1) 
+					&& vm_claim_page(stack_bottom))){
+		struct page *page = spt_find_page(&thread_current()->spt,stack_bottom);
+		palloc_free_page(page);
+		PANIC("vm_alloc_page failed");
+	}		
+	memset(stack_bottom,0,PGSIZE);
+	if_->rsp = USER_STACK;
+	return true;
 }
 #endif /* VM */

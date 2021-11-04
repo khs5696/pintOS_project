@@ -1,0 +1,23 @@
+FAIL
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (create-normal) begin
+  (create-normal) create quux.dat
+  (create-normal) end
+  create-normal: exit(0)
+Differences in `diff -u' format:
+- (create-normal) begin
+- (create-normal) create quux.dat
+- (create-normal) end
+- create-normal: exit(0)
++ Page fault at 0x400c1c: not present error reading page in user context.
++ create-normal: dying due to interrupt 0x0e (#PF Page-Fault Exception).
++ Interrupt 0x0e (#PF Page-Fault Exception) at rip=400c1c
++  cr2=0000000000400c1c error=               4
++ rax 0000000000000000 rbx 0000000000000000 rcx 0000000000000000 rdx 0000000000000000
++ rsp 000000004747ffd8 rbp 0000000000000000 rsi 000000004747ffe0 rdi 0000000000000001
++ rip 0000000000400c1c r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
++ r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
++ r15 0000000000000000 rflags 00000202
++ es: 001b ds: 001b cs: 0023 ss: 001b

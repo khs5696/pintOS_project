@@ -1,0 +1,71 @@
+FAIL
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (args) begin
+  (args) argc = 23
+  (args) argv[0] = 'args-many'
+  (args) argv[1] = 'a'
+  (args) argv[2] = 'b'
+  (args) argv[3] = 'c'
+  (args) argv[4] = 'd'
+  (args) argv[5] = 'e'
+  (args) argv[6] = 'f'
+  (args) argv[7] = 'g'
+  (args) argv[8] = 'h'
+  (args) argv[9] = 'i'
+  (args) argv[10] = 'j'
+  (args) argv[11] = 'k'
+  (args) argv[12] = 'l'
+  (args) argv[13] = 'm'
+  (args) argv[14] = 'n'
+  (args) argv[15] = 'o'
+  (args) argv[16] = 'p'
+  (args) argv[17] = 'q'
+  (args) argv[18] = 'r'
+  (args) argv[19] = 's'
+  (args) argv[20] = 't'
+  (args) argv[21] = 'u'
+  (args) argv[22] = 'v'
+  (args) argv[23] = null
+  (args) end
+  args-many: exit(0)
+Differences in `diff -u' format:
+- (args) begin
+- (args) argc = 23
+- (args) argv[0] = 'args-many'
+- (args) argv[1] = 'a'
+- (args) argv[2] = 'b'
+- (args) argv[3] = 'c'
+- (args) argv[4] = 'd'
+- (args) argv[5] = 'e'
+- (args) argv[6] = 'f'
+- (args) argv[7] = 'g'
+- (args) argv[8] = 'h'
+- (args) argv[9] = 'i'
+- (args) argv[10] = 'j'
+- (args) argv[11] = 'k'
+- (args) argv[12] = 'l'
+- (args) argv[13] = 'm'
+- (args) argv[14] = 'n'
+- (args) argv[15] = 'o'
+- (args) argv[16] = 'p'
+- (args) argv[17] = 'q'
+- (args) argv[18] = 'r'
+- (args) argv[19] = 's'
+- (args) argv[20] = 't'
+- (args) argv[21] = 'u'
+- (args) argv[22] = 'v'
+- (args) argv[23] = null
+- (args) end
+- args-many: exit(0)
++ Page fault at 0x400c7f: not present error reading page in user context.
++ args-many: dying due to interrupt 0x0e (#PF Page-Fault Exception).
++ Interrupt 0x0e (#PF Page-Fault Exception) at rip=400c7f
++  cr2=0000000000400c7f error=               4
++ rax 0000000000000000 rbx 0000000000000000 rcx 0000000000000000 rdx 0000000000000000
++ rsp 000000004747ff00 rbp 0000000000000000 rsi 000000004747ff08 rdi 0000000000000017
++ rip 0000000000400c7f r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
++ r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
++ r15 0000000000000000 rflags 00000202
++ es: 001b ds: 001b cs: 0023 ss: 001b

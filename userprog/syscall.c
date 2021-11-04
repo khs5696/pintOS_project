@@ -58,7 +58,8 @@ syscall_init (void) {
 // JH 또 user가 전달한 pointer가 mapping 되지 않았을 수도 있음으로 이것도 체크
 // 잘못된 포인터를 제공할 경우, 사용자 프로세스 종료
 void check_address (void * addr) {
-	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))	{
+	// if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4, addr))	{
+	if (!is_user_vaddr(addr)) {
 		exit(-1);
 	}
 }

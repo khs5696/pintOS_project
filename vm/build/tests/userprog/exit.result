@@ -1,0 +1,19 @@
+FAIL
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (exit) begin
+  exit: exit(57)
+Differences in `diff -u' format:
+- (exit) begin
+- exit: exit(57)
++ Page fault at 0x400bd2: not present error reading page in user context.
++ exit: dying due to interrupt 0x0e (#PF Page-Fault Exception).
++ Interrupt 0x0e (#PF Page-Fault Exception) at rip=400bd2
++  cr2=0000000000400bd2 error=               4
++ rax 0000000000000000 rbx 0000000000000000 rcx 0000000000000000 rdx 0000000000000000
++ rsp 000000004747ffe0 rbp 0000000000000000 rsi 000000004747ffe8 rdi 0000000000000001
++ rip 0000000000400bd2 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
++ r11 0000000000000000 r12 0000000000000000 r13 0000000000000000 r14 0000000000000000
++ r15 0000000000000000 rflags 00000202
++ es: 001b ds: 001b cs: 0023 ss: 001b

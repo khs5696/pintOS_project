@@ -10,6 +10,8 @@
 
 #include "vm/vm.h"
 #include "vm/uninit.h"
+#include "userprog/process.h"
+
 
 static bool uninit_initialize (struct page *page, void *kva);
 static void uninit_destroy (struct page *page);
@@ -49,15 +51,19 @@ uninit_initialize (struct page *page, void *kva) {
 
 	/* Fetch first, page_initialize may overwrite the values */
 	vm_initializer *init = uninit->init;
-	void *aux = uninit->aux;
+	struct load_args *aux = uninit->aux;
 
 	/* TODO: You may need to fix this function. */
 	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
 	// vm_do_claim_page()에서 호출		swap_in (page, frame->kva)
 	// 변수 init에는 vm_alloc_page_with_initializer()에 의해 lazy_load_segment() 존재
 	// 변수 page_initializer에는 페이지 타입에 맞는 initializer 존재
-	return uninit->page_initializer (page, uninit->type, kva) &&
-		(init ? init (page, aux) : true);
+	bool tmp1 = uninit->page_initializer (page, uninit->type, kva);
+	bool tmp2 = (init ? init (page, aux) : true);
+	// if (tmp2) {printf("tmp2 is true\n");}
+	return tmp1 && tmp2;
+	// return uninit->page_initializer (page, uninit->type, kva) &&
+	// 	(init ? init (page, NULL) : true);
 }
 
 /* Free the resources hold by uninit_page. Although most of pages are transmuted
@@ -69,4 +75,5 @@ uninit_destroy (struct page *page) {
 	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
+	free(page->uninit.aux);
 }

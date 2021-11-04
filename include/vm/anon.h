@@ -5,6 +5,10 @@ struct page;
 enum vm_type;
 
 struct anon_page {
+	void* padding; 
+	enum vm_type type;
+	struct load_args *aux;
+  int swap_idx;
 };
 
 void vm_anon_init (void);
