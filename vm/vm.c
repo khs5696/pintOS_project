@@ -60,6 +60,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
+	// if(aux != NULL)
+	// 	printf("file length in vm_alloc_page_with_initializer aux->file %d\n", file_length(((struct load_args *)aux)->file));
+
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
 		/* TODO: Create the page, fetch the initialier according to the VM type,
@@ -82,7 +85,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		// spt(hash table)에 생성된 page를 삽입
 		// bool spt_insert_page (struct supplemental_page_table *spt UNUSED, struct page *page UNUSED)
-		struct page* page = (struct page*)malloc(sizeof(struct page));
+		struct page* page = (struct page *) malloc(sizeof(struct page));
 		ASSERT(page);
 
 		bool (*initializer)(struct page *, enum vm_type, void *);
@@ -97,7 +100,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 				PANIC("###### vm_alloc_page_with_initializer [unvalid type] ######");
 				break;
 		}
-
+		// printf("upage in vm_alloc_page_with_initializer: %p\n", upage);
 		uninit_new(page, upage, init, type, aux, initializer);
 		
 		// printf("file length 2 %d\n", file_length(((struct load_args *)aux)->file));
@@ -189,12 +192,10 @@ vm_get_frame (void) {
 	// vm_do_claim_page()에서 호출되어, palloc_get_page()로 물리 메모리 할당
 	void* p = palloc_get_page(PAL_USER);
 	if(p == NULL)
-		// printf("p is null\n");
-		return vm_evict_frame();
+		//return vm_evict_frame();
+		PANIC("TODO");
 
 	frame = (struct frame*)malloc(sizeof(struct frame));
-	printf("hello\n");
-	printf("frame %d\n", p);
 	if (frame == NULL) 
 		PANIC("failed to allocate frame");
 	
@@ -220,6 +221,8 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
+	// printf("vm_try_handle_fault: user = %s, write = %s, not_present = %s\n", user ? "true" : "false", write ? "true" : "false", not_present ? "true" : "false");
+	// printf("addr in vm_try_handle_fault: %p\n", addr);
 	// struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	// struct page *page = NULL;
 	/* TODO: Validate the fault */
@@ -234,22 +237,25 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
 	// return vm_do_claim_page (page);
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	if(is_kernel_vaddr(addr))
-    return false;
 
+	if(is_kernel_vaddr(addr))
+    	return false;
+	// printf("A\n");
 	void *rsp = is_kernel_vaddr(f->rsp) ? thread_current()->save_rsp : f->rsp;
 	struct page *page = spt_find_page(spt,addr);
-
+	// printf("B\n");
 	if(page){
+		// printf("C-1\n");
+		// printf("find page's va in vm_try_handler_fault : %p\n", page->va);
 		if (page->writable == 0 && write) {
 			// printf("page writable false\n");
 			return false;
 		}
-		// printf("it's okay\n");
+		// printf("D\n");
 		return vm_do_claim_page (page);
 	}
 	else{
-		// printf("not page\n");
+		// printf("C-2\n");
 		if(is_kernel_vaddr(f->rsp) && thread_current()->save_rsp){
 			rsp = thread_current()->save_rsp;
 		}
@@ -283,9 +289,10 @@ vm_claim_page (void *va UNUSED) {
 /* Claim the PAGE and set up the mmu. */
 static bool
 vm_do_claim_page (struct page *page) {
+	// printf("I'm in vm_do_claim_page\n");
 	struct frame *frame = vm_get_frame ();
 	if (frame == NULL) {
-		// printf("frame is NULL\n");
+		printf("frame is NULL\n");
 	}
 	
 	// struct load_args* args = page->uninit.aux;
@@ -307,6 +314,7 @@ vm_do_claim_page (struct page *page) {
 	// lazy_load_segment()를 호출해 disk에 있는 file을 물리메모리로 로드
 	// list_push_back (&victim_table, &page->victim_elem);
 	// printf("vm_type : %d\n", page->operations->type);
+	// printf("uninit_initialize start\n");
 	bool result = swap_in (page, frame->kva);
 	if (result) {
 		// printf("swap success\n");
@@ -317,7 +325,8 @@ vm_do_claim_page (struct page *page) {
 // HS 추가
 /* Computes and returns the hash value for hash element E, given
  * auxiliary data AUX. */
-uint64_t page_hash (const struct hash_elem *e, void *aux){
+uint64_t
+page_hash (const struct hash_elem *e, void *aux) {
 	const struct page* p = hash_entry(e, struct page, hash_elem);
 	return hash_bytes(&p->va, sizeof(p->va));
 }
@@ -325,15 +334,13 @@ uint64_t page_hash (const struct hash_elem *e, void *aux){
 /* Compares the value of two hash elements A and B, given
  * auxiliary data AUX.  Returns true if A is less than B, or
  * false if A is greater than or equal to B. */
-bool page_less (const struct hash_elem *a,
-		const struct hash_elem *b,
-		void *aux){
+bool
+page_less (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
 	struct page* page_a = hash_entry(a, struct page, hash_elem);
 	struct page* page_b = hash_entry(b, struct page, hash_elem);
 
 	return page_a->va < page_b->va;
 }
-
 
 /* Initialize new supplemental page table */
 void

@@ -30,6 +30,8 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 		enum vm_type type, void *aux,
 		bool (*initializer)(struct page *, enum vm_type, void *)) {
 	ASSERT (page != NULL);
+	// if(aux != NULL)
+	// 	printf("file length in uninit_new aux->file %d\n", file_length(((struct load_args *)aux)->file));
 
 	*page = (struct page) {
 		.operations = &uninit_ops,
@@ -51,8 +53,10 @@ uninit_initialize (struct page *page, void *kva) {
 
 	/* Fetch first, page_initialize may overwrite the values */
 	vm_initializer *init = uninit->init;
-	struct load_args *aux = uninit->aux;
-
+	struct load_args * aux = uninit->aux;
+	// if (aux != NULL) {
+	// 	printf("file length in uninit_initialize uninit->aux->file %d\n", file_length( ((struct load_args *)aux)->file ));
+	// }
 	/* TODO: You may need to fix this function. */
 	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
 	// vm_do_claim_page()에서 호출		swap_in (page, frame->kva)

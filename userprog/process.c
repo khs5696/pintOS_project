@@ -265,7 +265,7 @@ process_exec(void *f_name) {
 	// Stack Organization 관련 변수
 	int argc = 0; 
 	int command_len = 0;			// alignment를 위해 token들이 stack에서 차지하는 byte
-	char *argv[50];	
+	char *argv[50];
 	char *command_address[50];		// stack에서의 각 token 주소(포인터)를 저장할 배열
 
 	/* HS 2-1-1. Command Parsing */
@@ -303,9 +303,11 @@ process_exec(void *f_name) {
 	// create_initd()에서 대기 중인 waiting_load_sema를 sema_up
 	sema_up(&thread_current()->parent_thread->waiting_load_sema);
 
-	if (!success)
+	if (!success) {
+		// printf("fail to load in process_exec\n");
 		return -1;
-	
+	}
+	// printf("success to load in process_exec!\n");
 	/* HS 2-1-2. Stack Organization */
 	// argv에 저장된 token을 순서대로 stack에 삽입
 	int length = 0;
@@ -340,6 +342,9 @@ process_exec(void *f_name) {
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* Start switched process. */
+	// printf("\n");
+	// printf("---------------user program start!------------\n");
+	// printf("\n");
 	do_iret(&_if);
 	palloc_free_page(file_name); 
 	NOT_REACHED();
@@ -524,6 +529,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool
 load (const char *file_name, struct intr_frame *if_) {
+	//printf("I'm in load\n");
 	struct thread *t = thread_current ();
 	struct ELF ehdr;
 	struct file *file = NULL;
@@ -606,19 +612,24 @@ load (const char *file_name, struct intr_frame *if_) {
 						zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
 					}
 					if (!load_segment (file, file_page, (void *) mem_page,
-								read_bytes, zero_bytes, writable))
+								read_bytes, zero_bytes, writable)) {
+						printf("fail to load_segment\n");
+				
 						goto done;
+					}
 				}
 				else
 					goto done;
 				break;
 		}
 	}
+	// printf("success to load_segment\n");
 
 	/* Set up stack. */
-	if (!setup_stack (if_))
+	if (!setup_stack (if_)) {
+		// printf("fail to setup_stack\n");
 		goto done;
-
+	}
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
@@ -626,9 +637,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
 	success = true;
+	return success;
 
 done:
 	/* We arrive here whether the load is successful or not. */
+
 	file_close (file);
 	return success;
 }
@@ -802,11 +815,11 @@ lazy_load_segment (struct page *page, void *aux) {
 	// printf("ofs %d\n", (int) args->ofs);
 	file_seek(args->file, args->ofs); //? file->pos update
 	// printf("file length %d\n", file_length(args->file));
-	printf("file length 3 %d\n", file_length(((struct load_args *)args)->file));
+	// printf("file length 3 %d\n", file_length(((struct load_args *)args)->file));
 	int read_byte = file_read (((struct load_args *)args)->file, kpage, args->read_bytes);
-	printf("a %d\n", read_byte);
-	printf("c %d\n", kpage);
-	printf("b %d\n", (int) args->read_bytes);
+	// printf("a %d\n", read_byte);
+	// printf("c %d\n", kpage);
+	// printf("b %d\n", (int) args->read_bytes);
 	if (read_byte != (int) args->read_bytes) {
 		// printf("lazy fail\n");
 		palloc_free_page (kpage);
@@ -833,7 +846,8 @@ lazy_load_segment (struct page *page, void *aux) {
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
-	// printf("read_byte first : %d\n", read_bytes);
+	// printf("total read_byte: %d\n", read_bytes);
+	// printf("total zero_byte: %d\n", zero_bytes);
 	ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
 	ASSERT (pg_ofs (upage) == 0);
 	ASSERT (ofs % PGSIZE == 0);
@@ -853,21 +867,14 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		// vm_alloc_page_with_initializer()에 사용될 argument AUX를 준비
 		// page fault가 발생하여 데이터를 로드할 때 파일의 offset / size / 패딩할 zero_byte etc.
-		struct load_args* args = (struct load_args*)malloc(sizeof(struct load_args));
+		struct load_args* args = (struct load_args *) malloc(sizeof(struct load_args));
 		args->file = file;
-		printf("file length 0 %d\n", file_length(args->file));
+		// printf("file length in load_segment args->file %d\n", file_length(args->file));
 		args->ofs = ofs;
-		// printf("first %d\n", (int) ofs);
-		// printf("second %d\n", (int) args->ofs);
+		// printf("file ofs in load_segment args->file %d\n", args->ofs);
 		args->read_bytes = page_read_bytes;
-		// printf("first %d\n", (int) page_read_bytes);
-		// printf("second %d\n", (int) args->read_bytes);
 		args->zero_bytes = page_zero_bytes;
-		// printf("first %d\n", (int) page_zero_bytes);
-		// printf("second %d\n", (int) args->zero_bytes);
-		args->read_bytes_sum = read_bytes;
-		// printf("first %d\n", (int) read_bytes);
-		// printf("second %d\n", (int) args->read_bytes_sum);
+		//args->read_bytes_sum = read_bytes;
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,   //?왜 VM_ANON만 설정해놓는걸까? 
 					writable, lazy_load_segment, args))
 			return false;
@@ -886,8 +893,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a PAGE of stack at the USER_STACK. Return true on success. */
 static bool
 setup_stack (struct intr_frame *if_) {
+	// printf("-----------------------------I'm in setup_stack---------------------------\n");
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
+	// printf("A\n");
+
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
@@ -898,8 +908,7 @@ setup_stack (struct intr_frame *if_) {
 	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
 	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
 	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 보조 마커를 활용 가능
-	if(! (vm_alloc_page (VM_ANON|VM_STACK, stack_bottom, 1) 
-					&& vm_claim_page(stack_bottom))){
+	if(!( vm_alloc_page (VM_ANON|VM_STACK, stack_bottom, 1) && vm_claim_page(stack_bottom) )){
 		struct page *page = spt_find_page(&thread_current()->spt,stack_bottom);
 		palloc_free_page(page);
 		PANIC("vm_alloc_page failed");

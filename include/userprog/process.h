@@ -2,13 +2,14 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
+#include "filesys/file.h"
 
-struct load_args{
+struct load_args {
   struct file *file;
   off_t ofs;
   uint32_t read_bytes;
   uint32_t zero_bytes;
-  size_t read_bytes_sum;
+  //size_t read_bytes_sum;
 };
 
 tid_t process_create_initd (const char *file_name);

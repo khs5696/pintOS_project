@@ -114,7 +114,7 @@ kill (struct intr_frame *f) {
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-	 (struct intr_frame *f) {
+page_fault (struct intr_frame *f) {
 	bool not_present;  /* True: not-present page, false: writing r/o page. */
 	bool write;        /* True: access was write, false: access was read. */
 	bool user;         /* True: access by user, false: access by kernel. */
@@ -138,7 +138,7 @@ static void
 
 #ifdef VM
 	/* For project 3 and later. */
-	printf("page fault ----------------------\n");
+	// printf("---------------make page fault by vm_try_handle_fault------------------\n");
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
@@ -146,7 +146,7 @@ static void
 	/* Count page faults. */
 	page_fault_cnt++;
 	
-	printf("page fault 2 ----------------------\n");
+	// printf("----------------------fail in vm_try_handle_fault----------------------\n");
 	exit(-1);
 
 	/* If the fault is true fault, show info and exit. */
