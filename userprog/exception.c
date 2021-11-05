@@ -138,16 +138,14 @@ page_fault (struct intr_frame *f) {
 
 #ifdef VM
 	/* For project 3 and later. */
-	// printf("---------------make page fault by vm_try_handle_fault------------------\n");
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
-
+	exit(-1);
+	
 	/* Count page faults. */
 	page_fault_cnt++;
-	
-	// printf("----------------------fail in vm_try_handle_fault----------------------\n");
-	exit(-1);
+
 
 	/* If the fault is true fault, show info and exit. */
 	printf ("Page fault at %p: %s error %s page in %s context.\n",

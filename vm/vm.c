@@ -356,6 +356,37 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 bool
 supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 		struct supplemental_page_table *src UNUSED) {
+	bool success = true;
+	struct hash *h = &src->hash_table;
+	struct hash_iterator i;
+	hash_first (&i, h);
+
+	while (hash_next (&i))
+	{
+		struct page *page = hash_entry (hash_cur (&i), struct page, hash_elem);
+		enum vm_type type = page->operations->type;
+
+		if (VM_TYPE(type) == VM_UNINIT){    
+			struct load_args* args = (struct load_args*)malloc(sizeof(struct load_args));
+			memcpy(args, page->uninit.aux, sizeof(struct load_args));
+			success = vm_alloc_page_with_initializer(page->vm_type, page->va,
+					page->writable, page->uninit.init, args);
+		}
+		else if (VM_TYPE(type) == VM_ANON){
+			success = vm_alloc_page(VM_ANON|VM_STACK, page->va, 
+					page->writable);
+			vm_claim_page(page->va);
+			struct page *new_page = spt_find_page (&thread_current()->spt, page->va);
+			memcpy(new_page->va, page->frame->kva, PGSIZE);
+		}
+		// else if(VM_TYPE(type) == VM_FILE){
+		// 	struct load_args* args = (struct load_args*)malloc(sizeof(struct load_args));
+		// 	memcpy(args, page->file.aux, sizeof(struct load_args));
+		// 	success = vm_alloc_page_with_initializer(VM_FILE, page->va, 
+		// 			page->writable, NULL, args);
+		// }
+	}
+	return success;
 }
 
 void supplemental_page_table_destructor(struct hash_elem *e, void *aux){

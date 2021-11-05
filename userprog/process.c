@@ -396,13 +396,16 @@ process_exit (void) {
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
 	while (!list_empty(curr->fd_list)) {
 		struct fd_elem * tmp = list_entry(list_pop_front(curr->fd_list), struct fd_elem, elem);
-
+		// if (tmp->file_ptr == curr->exec_file) {
+		// 	continue;
+		// }
 		// 파일을 닫는 동안, 추가적인 접근을 통제하기 위해 synchronization
-		lock_acquire(&file_synch_lock);
+		// lock_acquire(&file_synch_lock);
 		file_close(tmp->file_ptr);
-		lock_release(&file_synch_lock);
+		// lock_release(&file_synch_lock);
 		free(tmp);
 	}
+	file_close(curr->exec_file);
 
 	free(curr->fd_list);
 
@@ -550,6 +553,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	}
 
+
+	t->exec_file = file;
 	// HS 2-4-1. Deny Write on Executables
 	// 실행 중인 유저 프로그램에 대한 변경을 막기 위해 file_deny_write() 사용
 	// 접근 제한은 file_close()의 file_allow_write()에 의해서 프로그램이 종료 될 때 해제
@@ -637,12 +642,13 @@ load (const char *file_name, struct intr_frame *if_) {
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
 	success = true;
-	return success;
+	// return success;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-
-	file_close (file);
+	if (file != thread_current()->exec_file)
+		file_close (file);
+	// file_close (file);
 	return success;
 }
 

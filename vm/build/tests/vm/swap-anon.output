@@ -5,7 +5,7 @@ Pintos booting with:
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x9e0000 (Usable: 9,088 kB)
 Calibrating timer...  157,081,600 loops/s.
-hd0:0: detected 329 sector (164 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:0: detected 337 sector (168 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 104 sector (52 kB) disk, model "QEMU HARDDISK", serial "QM00003"
 hd1:1: detected 60,480 sector (29 MB) disk, model "QEMU HARDDISK", serial "QM00004"
@@ -13,17 +13,20 @@ Formatting file system...done.
 Boot complete.
 Putting 'swap-anon' into the file system...
 Executing 'swap-anon':
-Kernel PANIC at ../../userprog/process.c:100 in initd(): Fail to launch initd
-
-Call stack: 0x80042188bf 0x800421c0b7 0x8004207701.
+(swap-anon) begin
+(swap-anon) write sparsely over page 0
+(swap-anon) write sparsely over page 512
+(swap-anon) write sparsely over page 1024
+Kernel PANIC at ../../vm/vm.c:196 in vm_get_frame(): TODO
+Call stack: 0x80042188bf 0x8004221bc7 0x8004221f05 0x8004221dc5 0x800421d7a7 0x800420980d 0x8004209c2b 0x400cac 0x400cf5.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 67 ticks
-Thread: 36 idle ticks, 30 kernel ticks, 1 user ticks
+Timer: 107 ticks
+Thread: 37 idle ticks, 34 kernel ticks, 36 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 39 reads, 236 writes
+hd0:1: 80 reads, 236 writes
 hd1:0: 104 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1143 characters output
+Console: 1334 characters output
 Key

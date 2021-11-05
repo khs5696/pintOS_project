@@ -95,6 +95,8 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+// 수정
+ struct file *exec_file;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

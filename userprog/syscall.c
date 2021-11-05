@@ -294,7 +294,9 @@ read (int fd, const void *buffer, unsigned size) {
 
 		if (read_file != NULL) {
 			lock_acquire(&file_synch_lock);
+			// printf("a\n");
 			actually_read_byte = file_read(read_file, buffer, size);
+			// printf("b\n");
 			lock_release(&file_synch_lock);
 			return actually_read_byte;
 		} else {
