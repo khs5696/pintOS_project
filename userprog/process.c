@@ -809,7 +809,7 @@ lazy_load_segment (struct page *page, void *aux) {
 
 	/* HS 3-2-4. 실제로 page와 연결된 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
-	uint8_t* pa = (page->pa)->kva;
+	uint8_t* pa = (page->frame)->kva;
 	struct page_info* info = page->uninit.aux;
 	// file의 pointer를 info->ofs로 옮김으로써 앞으로 file을 읽을 때
 	// 원하는 위치인 ofs부터 읽도록 만듦.
