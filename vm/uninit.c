@@ -31,7 +31,7 @@ uninit_new (struct page *page, void *va, vm_initializer *init,
 		bool (*initializer)(struct page *, enum vm_type, void *)) {
 	ASSERT (page != NULL);
 	// if(aux != NULL)
-	// 	printf("file length in uninit_new aux->file %d\n", file_length(((struct load_args *)aux)->file));
+	// 	printf("file length in uninit_new aux->file %d\n", file_length(((struct page_info *)aux)->file));
 
 	*page = (struct page) {
 		.operations = &uninit_ops,
@@ -52,22 +52,22 @@ uninit_initialize (struct page *page, void *kva) {
 	struct uninit_page *uninit = &page->uninit;
 
 	/* Fetch first, page_initialize may overwrite the values */
+	// JH : setup_stack 할 때 vm_alloc_page를 호출함.
+	// vm_alloc_page(type, upage, writable) == vm_alloc_page_with_initializer ((type), (upage), (writable), NULL, NULL)
+	// 때문에 이 경우 init과 aux가 NULL인 상태!
 	vm_initializer *init = uninit->init;
-	struct load_args * aux = uninit->aux;
+	struct page_info * aux = uninit->aux;
 	// if (aux != NULL) {
-	// 	printf("file length in uninit_initialize uninit->aux->file %d\n", file_length( ((struct load_args *)aux)->file ));
+	// 	printf("file length in uninit_initialize uninit->aux->file %d\n", file_length( ((struct page_info *)aux)->file ));
 	// }
+
 	/* TODO: You may need to fix this function. */
 	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
 	// vm_do_claim_page()에서 호출		swap_in (page, frame->kva)
-	// 변수 init에는 vm_alloc_page_with_initializer()에 의해 lazy_load_segment() 존재
+	// 변수 init에는 NULL이 아니라면, vm_alloc_page_with_initializer()에 의해 lazy_load_segment() 존재
 	// 변수 page_initializer에는 페이지 타입에 맞는 initializer 존재
-	bool tmp1 = uninit->page_initializer (page, uninit->type, kva);
-	bool tmp2 = (init ? init (page, aux) : true);
-	// if (tmp2) {printf("tmp2 is true\n");}
-	return tmp1 && tmp2;
-	// return uninit->page_initializer (page, uninit->type, kva) &&
-	// 	(init ? init (page, NULL) : true);
+	return uninit->page_initializer (page, uninit->type, kva) &&
+		(init ? init (page, NULL) : true);
 }
 
 /* Free the resources hold by uninit_page. Although most of pages are transmuted
@@ -79,5 +79,5 @@ uninit_destroy (struct page *page) {
 	struct uninit_page *uninit UNUSED = &page->uninit;
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
-	free(page->uninit.aux);
+	free(uninit->aux);
 }

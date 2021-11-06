@@ -807,31 +807,24 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
 
-	/* HS 3-2-4. 물리 메모리에 데이터 로드 */
+	/* HS 3-2-4. 실제로 page와 연결된 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
-	uint8_t* kpage = (page->frame)->kva;
-	uint8_t* upage = page->va;
-	struct load_args* args = page->uninit.aux;
-	// if (args->file == NULL) {
-	// 	printf('no file\n');
-	// }
-	// if (args->ofs == NULL) {
-	// 	printf('ofs\n');
-	// }
-	// printf("ofs %d\n", (int) args->ofs);
-	file_seek(args->file, args->ofs); //? file->pos update
-	// printf("file length %d\n", file_length(args->file));
-	// printf("file length 3 %d\n", file_length(((struct load_args *)args)->file));
-	int read_byte = file_read (((struct load_args *)args)->file, kpage, args->read_bytes);
+	uint8_t* pa = (page->pa)->kva;
+	struct page_info* info = page->uninit.aux;
+	// file의 pointer를 info->ofs로 옮김으로써 앞으로 file을 읽을 때
+	// 원하는 위치인 ofs부터 읽도록 만듦.
+	file_seek(info->file, info->ofs);
+
+	int read_byte = file_read (((struct page_info *)info)->file, pa, info->read_bytes);
 	// printf("a %d\n", read_byte);
-	// printf("c %d\n", kpage);
-	// printf("b %d\n", (int) args->read_bytes);
-	if (read_byte != (int) args->read_bytes) {
+	// printf("c %d\n", pa);
+	// printf("b %d\n", (int) info->read_bytes);
+	if (read_byte != (int) info->read_bytes) {
 		// printf("lazy fail\n");
-		palloc_free_page (kpage);
+		palloc_free_page (pa);
 		return false;
 	}
-	memset(kpage + args->read_bytes, 0, args->zero_bytes);
+	memset(pa + info->read_bytes, 0, info->zero_bytes);
 	return true;
 }
 
@@ -873,25 +866,24 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		// vm_alloc_page_with_initializer()에 사용될 argument AUX를 준비
 		// page fault가 발생하여 데이터를 로드할 때 파일의 offset / size / 패딩할 zero_byte etc.
-		struct load_args* args = (struct load_args *) malloc(sizeof(struct load_args));
-		args->file = file;
+		struct page_info * aux = (struct page_info *) malloc(sizeof(struct page_info));
+		aux->file = file;
 		// printf("file length in load_segment args->file %d\n", file_length(args->file));
-		args->ofs = ofs;
+		aux->ofs = ofs;
+		// 가상 메모리가 page 기반으로 변경되었기 때문에 ofs를 업데이트
+		ofs += page_read_bytes;
 		// printf("file ofs in load_segment args->file %d\n", args->ofs);
-		args->read_bytes = page_read_bytes;
-		args->zero_bytes = page_zero_bytes;
+		aux->read_bytes = page_read_bytes;
+		aux->zero_bytes = page_zero_bytes;
 		//args->read_bytes_sum = read_bytes;
-		if (!vm_alloc_page_with_initializer (VM_ANON, upage,   //?왜 VM_ANON만 설정해놓는걸까? 
-					writable, lazy_load_segment, args))
+		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
+					writable, lazy_load_segment, aux))
 			return false;
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
-
-		// 가상 메모리가 page 기반으로 변경되었기 때문에 ofs를 업데이트
-		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -902,24 +894,25 @@ setup_stack (struct intr_frame *if_) {
 	// printf("-----------------------------I'm in setup_stack---------------------------\n");
 	bool success = false;
 	void *stack_bottom = (void *) (((uint8_t *) USER_STACK) - PGSIZE);
-	// printf("A\n");
-
 
 	/* TODO: Map the stack on stack_bottom and claim the page immediately.
 	 * TODO: If success, set the rsp accordingly.
 	 * TODO: You should mark the page is stack. */
 	/* TODO: Your code goes here */
-
 	/* HS 3-1-4. lazy_loading을 위해 setup_stack() 수정 */
 	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
 	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
-	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 보조 마커를 활용 가능
-	if(!( vm_alloc_page (VM_ANON|VM_STACK, stack_bottom, 1) && vm_claim_page(stack_bottom) )){
-		struct page *page = spt_find_page(&thread_current()->spt,stack_bottom);
-		palloc_free_page(page);
+	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 VM_MARKER_0를 활용 가능
+	// 새로운 memory management system에서는 vm_alloc_page 혹은 vm_alloc_page_with_initializer로 페이지를 할당해야한다.
+	// 위 두 방법은 lazy loading 방법을 고수하고 있는 반면, 최초 stack은 lazy하게 loading이 될 필요가 없음으로
+	// 바로 vm_do_claim을 호출해서 stack 공간을 확보한다.
+	if(!( vm_alloc_page (VM_ANON|VM_MARKER_0, stack_bottom, 1) && vm_claim_page(stack_bottom) )){
+		struct page * p = spt_find_page(&thread_current()->spt,stack_bottom);
+		palloc_free_page(p);
 		PANIC("vm_alloc_page failed");
-	}		
-	memset(stack_bottom,0,PGSIZE);
+	}
+
+	memset(stack_bottom, 0, PGSIZE);
 	if_->rsp = USER_STACK;
 	return true;
 }

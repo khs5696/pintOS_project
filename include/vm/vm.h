@@ -19,7 +19,7 @@ enum vm_type {
 
 	/* Auxillary bit flag marker for store information. You can add more
 	 * markers, until the value is fit in the int. */
-	VM_STACK = (1 << 3),
+	VM_MARKER_0 = (1 << 3),
 	VM_MARKER_1 = (1 << 4),
 
 	/* DO NOT EXCEED THIS VALUE. */
@@ -92,7 +92,7 @@ struct page_operations {
  * All designs up to you for this. */
 struct supplemental_page_table {
 	/* HS 3-1-0. supplemental page table 자료 구조 선언 (hash table) */
-	struct hash hash_table;
+	struct hash table;
 };
 
 #include "threads/thread.h"
