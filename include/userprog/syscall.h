@@ -1,6 +1,7 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 #include "threads/synch.h"
+#include "filesys/off_t.h"
 
 typedef int pid_t;
 
@@ -29,5 +30,7 @@ int write(int fd, const void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close(int arg_fd);
+void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 
 #endif /* userprog/syscall.h */

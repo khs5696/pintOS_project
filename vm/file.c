@@ -46,13 +46,42 @@ file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 }
 
-/* Do the mmap */
-void *
-do_mmap (void *addr, size_t length, int writable,
-		struct file *file, off_t offset) {
-}
+// /* Do the mmap */
+// void *
+// do_mmap (void *addr, size_t length, int writable,
+// 		struct file *file, off_t offset) {
+// 	// JH 3-4-2 mmap에서 사용할 do_mmap 구현
+// 	// mapping의 범위가 이미 존재하고 있던 page를 덮어버리려고 하는 경우 실패 -> NULL 리턴
+// 	// load_segment와 유사한 과정
+// 	ASSERT(addr != NULL);
+// 	ASSERT(length != 0);
+// 	ASSERT(file != NULL);
+// 	ASSERT(pg_round_down(addr) == addr);
 
-/* Do the munmap */
-void
-do_munmap (void *addr) {
-}
+// 	void * tmp_addr = addr;
+// 	uint32_t read_bytes = length > file_length(file) ? file_length(file) : length;
+// 	uint32_t zero_bytes = pg_round_up(read_bytes) - read_bytes;
+
+// 	while(read_bytes > 0 || zero_bytes > 0) {
+// 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+// 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+// 		struct () * aux = () malloc(sizeof());
+// 		// 값 할당 과정
+// 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
+// 					writable, lazy_load_segment, aux))
+// 			return NULL;
+		
+// 		/* Advance. */
+// 		read_bytes -= page_read_bytes;
+// 		zero_bytes -= page_zero_bytes;
+// 		addr += PGSIZE;
+// 		offset += page_read_bytes;
+// 	}
+// 	return save_addr;
+// }
+
+// /* Do the munmap */
+// void
+// do_munmap (void *addr) {
+// }

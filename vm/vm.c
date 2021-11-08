@@ -193,6 +193,24 @@ vm_get_frame (void) {
 /* Growing the stack. */
 static void
 vm_stack_growth (void *addr UNUSED) {
+	// JH 3-3-2. stack의 size를 증가시켜 addr가 fault가 안 일어나게끔 해야한다.
+	// addr를 PGSIZE만큼 반올림 해서 사용해야한다. => pg_round_down()
+	// setup_stack에서 했던 것과 매우 유사 = vm_alloc_page하고 바로 vm_claim_page해서 0으로 memset
+	// addr를 valid pointer로 만들기 위해 2개 이상의 page를 할당해야할 수 있음으로, 충족될 때까지 계속 위 과정 반복
+
+	// 이걸 page 수를 계산해서 for문으로 돌릴 수도 있지 않을까?
+	addr = pg_round_down(addr);
+	while( !spt_find_page(&thread_current()->spt, addr) ) {
+		// 주어진 addr로 spt_find_page를 했는데 발견 못 함
+		// => 새로운 stack page 할당
+		if( !(vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true) && vm_claim_page(addr)) ) {
+			struct page * p = spt_find_page(&thread_current()->spt, addr);
+			palloc_free_page(p);
+			PANIC("Can't allocate page or frame for growing stack");
+		}
+		memset(addr, 0, PGSIZE);
+		addr = addr + PGSIZE;
+	}
 }
 
 /* Handle the fault on write_protected page */
@@ -206,47 +224,70 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	// printf("vm_try_handle_fault: user = %s, write = %s, not_present = %s\n", user ? "true" : "false", write ? "true" : "false", not_present ? "true" : "false");
 	// printf("addr in vm_try_handle_fault: %p\n", addr);
-	// struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	// struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	/* HS 3-2-1. 메모리 접근 및 page fault */
 	// exception.c의 page_fault()에 의해 호출
 	// vm_try_handle_fault (f, fault_addr, user, write, not_present)
-	// not_present를 참조하여 read only 페이지에 대한 접근인지 확인(???)
+
+	// JH page fault가 발생하는 원인
+	// - user program이 kernel virtual memory에 접근하려고 할 때 (USER PROGRAMS/Introduction/Virtual Memory Layout)
+	// - kernel에서 unmapped user virtual address에 접근하려고 할 때
+	// - 모든 invalid access
+	// invalid access (GitBook Virtual Memory/Introduction/Handling page fault)
+	// -> process를 terminate 시켜야함.
+	// 1. spt를 확인 했을 때도 없는 address에 접근하려고 할 때
+	// 2. user가 kernel virtual memory의 page를 읽으려고 할 때
+	// 3. read_only page에 write 하려고 할 때 => not_present가 false
+
+	// system_call과 user에 의한 page_fault는 intr_frame f에 rsp가 저장되어있음
+	// stack pointer는 user에서 kernel로 context switch가 일어날 때만 저장함으로 rsp가 undefined 일 수도 있음
 
 	// 해당 fault가 유효한 page fault인지 확인 (lazy loading fault)
 	// page fault가 발생한 주소(va)에 대한 page를 탐색 -> spt_find_page() 이용
 
+	
+
 	// return vm_do_claim_page (page);
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 
-	if(is_kernel_vaddr(addr))
+	if(is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
     	return false;
-	// printf("A\n");
+	// JH f로 들어온 intr_frame이 kernel에서 발생했을 수도 있기 때문에? user의 stack pointer를 가져오기 위함.
+	// save_rsp (x) thread_current()->fork_intr.rsp (o)
 	void *rsp = is_kernel_vaddr(f->rsp) ? thread_current()->save_rsp : f->rsp;
+	// JH spt에서 addr로 찾아보기
 	struct page *page = spt_find_page(spt,addr);
 	// printf("B\n");
-	if(page){
+	if(page){ // spt에 저장되어 있던 page = 언젠가는 load되어야 하지만 lazy하게 기다리고 있던 page
 		// printf("C-1\n");
 		// printf("find page's va in vm_try_handler_fault : %p\n", page->va);
+		// JH read_only page에 write하려고 했던 경우?
 		if (page->writable == 0 && write) {
 			// printf("page writable false\n");
 			return false;
 		}
 		// printf("D\n");
+		// Jh lazy loading
 		return vm_do_claim_page (page);
 	}
-	else{
+	else{ // spt에 저장이 안되어 있던 page! -> load할 생각이 없었던 page
 		// printf("C-2\n");
+		// f->rsp에 kernel stack pointer가 저장되어 있고, thread_current()->fork_intr.rsp에 뭔가가 저장되어 있을 때
+		// rsp가 user stack pointer를 가리켜주도록!
+		// 이거 위에서 똑같이 해준 거 아님? && 이거 해주려면 그럼 thread_current()->fork_intr.rsp를 저장해서 한번 사용했으면 null로 바꿔주는 과정도 필요하지 않을까?
 		if(is_kernel_vaddr(f->rsp) && thread_current()->save_rsp){
 			rsp = thread_current()->save_rsp;
 		}
-
-		// if(user && write && addr > (USER_STACK - (1<<20)) && (int)addr >= ((int)rsp)-32 && addr < USER_STACK){
-		// 	vm_stack_growth(addr);
-		// 	return true;
-		// }
+		// JH 3-3-1. Stack Growth를 위한 page fault를 인식하기 위해 조건 추가
+		// 이번 과제에서 stack은 최대 1MB(== 1 << 20) 만큼 커질 수 있게 구현
+		// addr가 USER_STACK의 밑을 가리켜야함, USER_STACK 위를 가리키고 있으면 그건 그냥 애초에 잘못 된 거
+		// USER_STACK = 0x47480000
+		// 저 -32는 한양대 163p에 있는 내용인데 우리는 'rsp 8바이트 아래에서 page fault가 발생할 수 있다.'(GitBook Stack Growth)라고 했는데 이게 그건가.....?
+		if(user && write && addr > (USER_STACK - (1<<20)) && (int)addr >= ((int)rsp)-32 && addr < USER_STACK){
+			vm_stack_growth(addr);
+			return true;
+		}
 		return false;
 	}
 }

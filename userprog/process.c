@@ -810,7 +810,7 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* HS 3-2-4. 실제로 page와 연결된 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
 	uint8_t* pa = (page->frame)->kva;
-	struct page_info* info = page->uninit.aux;
+	struct page_info* info = aux;
 	// file의 pointer를 info->ofs로 옮김으로써 앞으로 file을 읽을 때
 	// 원하는 위치인 ofs부터 읽도록 만듦.
 	file_seek(info->file, info->ofs);
@@ -904,9 +904,10 @@ setup_stack (struct intr_frame *if_) {
 	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
 	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 VM_MARKER_0를 활용 가능
 	// 새로운 memory management system에서는 vm_alloc_page 혹은 vm_alloc_page_with_initializer로 페이지를 할당해야한다.
+	// vm_alloc_page(type, upage, writable) == vm_alloc_page_with_initializer (type, upage, writable, NULL, NULL)
 	// 위 두 방법은 lazy loading 방법을 고수하고 있는 반면, 최초 stack은 lazy하게 loading이 될 필요가 없음으로
 	// 바로 vm_do_claim을 호출해서 stack 공간을 확보한다.
-	if(!( vm_alloc_page (VM_ANON|VM_MARKER_0, stack_bottom, 1) && vm_claim_page(stack_bottom) )){
+	if(!( vm_alloc_page (VM_ANON|VM_MARKER_0, stack_bottom, true) && vm_claim_page(stack_bottom) )){
 		struct page * p = spt_find_page(&thread_current()->spt,stack_bottom);
 		palloc_free_page(p);
 		PANIC("vm_alloc_page failed");

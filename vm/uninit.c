@@ -67,7 +67,7 @@ uninit_initialize (struct page *page, void *kva) {
 	// 변수 init에는 NULL이 아니라면, vm_alloc_page_with_initializer()에 의해 lazy_load_segment() 존재
 	// 변수 page_initializer에는 페이지 타입에 맞는 initializer 존재
 	return uninit->page_initializer (page, uninit->type, kva) &&
-		(init ? init (page, NULL) : true);
+		(init ? init (page, aux) : true);
 }
 
 /* Free the resources hold by uninit_page. Although most of pages are transmuted
