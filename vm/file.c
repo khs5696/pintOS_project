@@ -146,7 +146,8 @@ do_mmap (void *addr, size_t length, int writable,
 
 		struct page_info * aux = (struct page_info *) malloc(sizeof(struct page_info));
 		// 값 할당 과정
-		aux->file = file;
+		struct file * dup_file = file_reopen(file);
+		aux->file = dup_file;
 		aux->ofs = offset;
 		offset += page_read_bytes;
 		aux->read_bytes = page_read_bytes;
@@ -175,18 +176,20 @@ do_munmap (void *addr) {
 	struct supplemental_page_table * spt = &thread_current()->spt;
 	struct page * first_page_to_munmap = spt_find_page(spt, addr);
 
-	struct file* file = file_reopen(first_page_to_munmap->file.file);
+	struct file* dup_file = first_page_to_munmap->file.file;
 
 	ASSERT(pg_round_down(addr) == addr);
 	ASSERT(first_page_to_munmap->file.is_first);
 
 	int num_to_munmap = first_page_to_munmap->file.left_page;
+	printf("num of munmap: %d\n", num_to_munmap);
 	for(int i = 0; i <= num_to_munmap; i++) {
+		printf("%d\n", i);
 		struct page * delete_page = spt_find_page(spt, addr + i*PGSIZE);
 		if(delete_page)
 			PANIC("There is no mmap page!");
 		hash_delete(&spt->table, &delete_page->hash_elem);
 		destroy_and_free_spt_entry(&delete_page->hash_elem, NULL);
 	}
-	file_close(file);
+	file_close(dup_file);
 }

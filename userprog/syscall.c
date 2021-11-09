@@ -297,8 +297,12 @@ read (int fd, const void *buffer, unsigned size) {
 		lock_release(&file_synch_lock);
 
 		return actually_read_byte;
-	} else if (fd >= 3) {	
+	} else if (fd >= 3) {
 		struct file * read_file = find_file_by_fd(fd);
+
+		
+		if(spt_find_page(&thread_current()->spt, buffer) != NULL && spt_find_page(&thread_current()->spt, buffer)->writable == 0)
+			exit(-1);
 
 		if (read_file != NULL) {
 			lock_acquire(&file_synch_lock);
@@ -429,6 +433,7 @@ munmap (void *addr) {
 	if (p->operations->type != VM_FILE || !p->file.is_first)	// page의 type이 VM_FILE이 아니거나, 해당 페이지가 처음 페이지가 아닌 경우
 		return;
 
+	printf("I'm doing do_munmap\n");
   	do_munmap(addr);
 
 }
