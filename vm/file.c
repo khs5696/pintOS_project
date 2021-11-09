@@ -42,12 +42,26 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
+	// 3-5-6. file-backed page의 swap_in 구현
+	// 그냥 page에 저장된 file에 대한 정보 가지고 kva에 다시 lazy_load_segment하면 될 듯?
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	// 3-5-5. file-backed page의 swap_out 구현
+	// vm_do_claim_page()에서 호출됨
+	// file_backed_destroy와 비슷하게 dirty_bit 확인하고 file_seek, file_write
+	// page가 수정된 이력이 있는지 확인해서 만약 없다면, 굳이 파일에 덮어쓰기 할 필요 없음
+	// -> pml4_is_dirty(uint64_t *pml4, const void *vpage)
+	//	  : "pml4"에서 "vpage"에 해당하는 PTE의 dirty bit 확인
+	// pml4에서 해당 PTE의 dirty_bit를 다시 0으로 만들어 줘야함.
+	// -> pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty)
+	//	  : "pml4"의 "vpage"에 해당하는 PTE의 dirty_bit를 "dirty"로 변경
+	// pml4에서 해당 페이지 지우기 & page->frame NULL로 변경
+	// -> pml4_clear_page (uint64_t *pml4, void *upage)
+	//	  : "pml4"의 "upage"의 not_present를 true로 변경해주는 함수
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
