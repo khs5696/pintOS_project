@@ -18,16 +18,16 @@ Executing 'mmap-write':
 (mmap-write) open "sample.txt"
 (mmap-write) mmap "sample.txt"
 (mmap-write) compare read data against written data
-(mmap-write) compare read data against written data: FAILED
-mmap-write: exit(1)
+(mmap-write) end
+mmap-write: exit(0)
 Execution of 'mmap-write' complete.
-Timer: 64 ticks
-Thread: 30 idle ticks, 31 kernel ticks, 4 user ticks
+Timer: 72 ticks
+Thread: 39 idle ticks, 29 kernel ticks, 4 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 118 reads, 256 writes
+hd0:1: 121 reads, 258 writes
 hd1:0: 107 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1146 characters output
+Console: 1103 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

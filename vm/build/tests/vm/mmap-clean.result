@@ -1,2 +1,1 @@
-FAIL
-run: write "sample.txt": FAILED
+PASS

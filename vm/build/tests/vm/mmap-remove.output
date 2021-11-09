@@ -4,7 +4,7 @@ Kernel command line: -q -f put mmap-remove put sample.txt run mmap-remove
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  209,510,400 loops/s.
+Calibrating timer...  157,081,600 loops/s.
 hd0:0: detected 337 sector (168 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 110 sector (55 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -20,16 +20,16 @@ Executing 'mmap-remove':
 (mmap-remove) remove "sample.txt"
 (mmap-remove) try to open "sample.txt"
 (mmap-remove) create "another"
-Kernel PANIC at ../../devices/disk.c:411 in select_sector(): assertion `sec_no < d->capacity' failed.
-Call stack: 0x80042188bf 0x8004214998 0x8004213f4c 0x8004220c5c 0x800421fc5d 0x8004222ad5 0x800422277c 0x80042222dc 0x800422207c 0x800421d797 0x800420980d 0x8004209c2b 0x4002f9 0x400e51 0x400e9a.
-The `backtrace' program can make call stacks useful.
-Read "Backtraces" in the "Debugging Tools" chapter
-of the Pintos documentation for more information.
-Timer: 74 ticks
-Thread: 37 idle ticks, 33 kernel ticks, 4 user ticks
+(mmap-remove) end
+mmap-remove: exit(0)
+Execution of 'mmap-remove' complete.
+Timer: 72 ticks
+Thread: 36 idle ticks, 31 kernel ticks, 5 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 168 reads, 361 writes
+hd0:1: 169 reads, 361 writes
 hd1:0: 110 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1568 characters output
-Key
+Console: 1192 characters output
+Keyboard: 0 keys pressed
+Exception: 0 page faults
+Powering off...

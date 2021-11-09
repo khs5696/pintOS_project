@@ -126,11 +126,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			close(f->R.rdi);
 			break;
 		case SYS_MMAP:
-			check_address(f->R.rdi);
+			// check_address(f->R.rdi);
 			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 			break;
 		case SYS_MUNMAP:
-			check_address(f->R.rsi);
+			check_address(f->R.rdi);
 			munmap(f->R.rdi);
 			break;
 		default:
@@ -407,7 +407,10 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// find_file_by_fd로 fd_list에서 fd 찾기 -> 없으면 NULL (v)
 	// file_reopen을 해주는데 fd로 찾아지면 그걸 굳이 또 reopen을 해야하나...? 라는 생각
 	// file_size가 offset보다 작은 경우 false (v)
-	if (addr == NULL || length == 0 || fd < 2)	// addr가 NULL이거나 length가 0이거나 STDIN&OUT을 mapping 하려고 하면 return NULL
+	if (is_kernel_vaddr(addr)) {
+		return NULL;
+	}
+	if (addr == NULL || length <= 0 || fd < 2)	// addr가 NULL이거나 length가 0이거나 STDIN&OUT을 mapping 하려고 하면 return NULL
 		return NULL;
 	if (pg_round_down(addr) != addr)	// addr가 page-aligned되어 들어오지 않은 경우 return NULL
 		return NULL;
@@ -416,7 +419,7 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if (!file)	// fd_list에서 file 찾았는데 없으면 NULL 리턴
 		return NULL;
 	off_t file_size = file_length(file);
-	if(file_size == 0 || file_size < offset)	// open된 file의 길이가 0이거나 file의 길이보다 offset이 더 큰 경우 NULL 리턴
+	if(file_size == 0 || file_size <= offset)	// open된 file의 길이가 0이거나 file의 길이보다 offset이 더 큰 경우 NULL 리턴
 		return NULL;
 	
 	return do_mmap(addr, length, writable, file, offset);
@@ -428,12 +431,12 @@ munmap (void *addr) {
 	if (pg_round_down(addr) != addr)
     	return;
 	struct page * p = spt_find_page(&thread_current()->spt, addr);
-	if (p)	// spt에서 찾았는데 없는 경우 -> 잘못된 addr 주소
+	if (p == NULL)	// spt에서 찾았는데 없는 경우 -> 잘못된 addr 주소
 		return;
 	if (p->operations->type != VM_FILE || !p->file.is_first)	// page의 type이 VM_FILE이 아니거나, 해당 페이지가 처음 페이지가 아닌 경우
 		return;
 
-	printf("I'm doing do_munmap\n");
+	// printf("I'm doing do_munmap\n");
   	do_munmap(addr);
 
 }

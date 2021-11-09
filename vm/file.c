@@ -78,8 +78,9 @@ file_backed_destroy (struct page *page) {
 	}
 	memset(page->va, 0, PGSIZE);
 
-	if(page->frame)
+	if(page->frame != NULL)
 		free(page->frame);
+	// free(file_page);
 }
 // aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
 
@@ -109,6 +110,7 @@ lazy_load_segment (struct page *page, void *aux) {
 		return false;
 	}
 	memset(pa + info->read_bytes, 0, info->zero_bytes);
+	free(aux);
 	return true;
 }
 
@@ -182,11 +184,11 @@ do_munmap (void *addr) {
 	ASSERT(first_page_to_munmap->file.is_first);
 
 	int num_to_munmap = first_page_to_munmap->file.left_page;
-	printf("num of munmap: %d\n", num_to_munmap);
+	// printf("num of munmap: %d\n", num_to_munmap);
 	for(int i = 0; i <= num_to_munmap; i++) {
-		printf("%d\n", i);
+		// printf("%d\n", i);
 		struct page * delete_page = spt_find_page(spt, addr + i*PGSIZE);
-		if(delete_page)
+		if(delete_page == NULL)
 			PANIC("There is no mmap page!");
 		hash_delete(&spt->table, &delete_page->hash_elem);
 		destroy_and_free_spt_entry(&delete_page->hash_elem, NULL);
