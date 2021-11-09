@@ -2,6 +2,7 @@
 
 #include "vm/vm.h"
 #include "filesys/file.h"
+#include "userprog/process.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -66,7 +67,36 @@ file_backed_destroy (struct page *page) {
 	if(page->frame)
 		free(page->frame);
 }
-aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
+// aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
+
+
+
+static bool
+lazy_load_segment (struct page *page, void *aux) {
+	/* TODO: Load the segment from the file */
+	/* TODO: This called when the first page fault occurs on address VA. */
+	/* TODO: VA is available when calling this function. */
+
+	/* HS 3-2-4. 실제로 page와 연결된 물리 메모리에 데이터 로드 */
+	// uninit.c의 uniuninit_initialize()에서 호출
+	uint8_t* pa = (page->frame)->kva;
+	struct page_info* info = aux;
+	// file의 pointer를 info->ofs로 옮김으로써 앞으로 file을 읽을 때
+	// 원하는 위치인 ofs부터 읽도록 만듦.
+	file_seek(info->file, info->ofs);
+
+	int read_byte = file_read (((struct page_info *)info)->file, pa, info->read_bytes);
+	// printf("a %d\n", read_byte);
+	// printf("c %d\n", pa);
+	// printf("b %d\n", (int) info->read_bytes);
+	if (read_byte != (int) info->read_bytes) {
+		// printf("lazy fail\n");
+		palloc_free_page (pa);
+		return false;
+	}
+	memset(pa + info->read_bytes, 0, info->zero_bytes);
+	return true;
+}
 
 /* Do the mmap */
 void *
@@ -88,10 +118,10 @@ do_mmap (void *addr, size_t length, int writable,
 	// zero_bytes : page 단위로 맞춰야하기 때문에 남는 공간을 채울 0의 byte 수
 	uint32_t zero_bytes = pg_round_up(read_bytes) - read_bytes;
 	// page_num 앞으로 할당할 page(or frame)의 수
-	int page_num = pg_round_up(read_bytes)/PGSIZE - 1;
+	int page_num = (int)pg_round_up(read_bytes)/PGSIZE - 1;
 
 	// 앞으로 넣을 공간에 이미 어떤 데이터가 있는 지 미리 확인
-	for (i = 0; i <= page_num; i++) {
+	for (int i = 0; i <= page_num; i++) {
 		if(spt_find_page(&thread_current()->spt, addr + i*PGSIZE))
 			return NULL;
 	}
@@ -139,7 +169,7 @@ do_munmap (void *addr) {
 	int num_to_munmap = first_page_to_munmap->file.left_page;
 	for(int i = 0; i <= num_to_munmap; i++) {
 		struct page * delete_page = spt_find_page(spt, addr + i*PGSIZE);
-		if(page)
+		if(delete_page)
 			PANIC("There is no mmap page!");
 		hash_delete(&spt->table, &delete_page->hash_elem);
 		destroy_and_free_spt_entry(&delete_page->hash_elem, NULL);

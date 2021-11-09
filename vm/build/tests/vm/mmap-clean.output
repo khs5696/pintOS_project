@@ -17,14 +17,17 @@ Executing 'mmap-clean':
 (mmap-clean) begin
 (mmap-clean) open "sample.txt"
 (mmap-clean) mmap "sample.txt"
+(mmap-clean) write "sample.txt"
+(mmap-clean) write "sample.txt": FAILED
+mmap-clean: exit(1)
 Execution of 'mmap-clean' complete.
-Timer: 70 ticks
-Thread: 35 idle ticks, 33 kernel ticks, 2 user ticks
+Timer: 69 ticks
+Thread: 33 idle ticks, 34 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 115 reads, 262 writes
+hd0:1: 117 reads, 262 writes
 hd1:0: 112 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1041 characters output
+Console: 1133 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

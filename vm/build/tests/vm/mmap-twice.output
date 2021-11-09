@@ -17,14 +17,20 @@ Executing 'mmap-twice':
 (mmap-twice) begin
 (mmap-twice) open "sample.txt" #0
 (mmap-twice) mmap "sample.txt" #0 at 0x10000000
+(mmap-twice) open "sample.txt" #1
+(mmap-twice) mmap "sample.txt" #1 at 0x20000000
+(mmap-twice) compare mmap'd file 0 against data
+(mmap-twice) compare mmap'd file 1 against data
+(mmap-twice) end
+mmap-twice: exit(0)
 Execution of 'mmap-twice' complete.
-Timer: 69 ticks
-Thread: 34 idle ticks, 31 kernel ticks, 4 user ticks
+Timer: 63 ticks
+Thread: 33 idle ticks, 26 kernel ticks, 4 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 113 reads, 256 writes
+hd0:1: 128 reads, 256 writes
 hd1:0: 109 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1061 characters output
+Console: 1276 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

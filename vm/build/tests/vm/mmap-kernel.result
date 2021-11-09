@@ -17,3 +17,4 @@ Differences in `diff -u' format:
 - (mmap-kernel) try to mmap over kernel 2
 - (mmap-kernel) end
 - mmap-kernel: exit(0)
++ mmap-kernel: exit(-1)

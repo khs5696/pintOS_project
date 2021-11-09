@@ -16,8 +16,8 @@ Executing 'close-bad-fd':
 (close-bad-fd) begin
 close-bad-fd: exit(-1)
 Execution of 'close-bad-fd' complete.
-Timer: 65 ticks
-Thread: 35 idle ticks, 29 kernel ticks, 1 user ticks
+Timer: 66 ticks
+Thread: 34 idle ticks, 30 kernel ticks, 2 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 80 reads, 232 writes
 hd1:0: 102 reads, 0 writes
