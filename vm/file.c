@@ -1,6 +1,7 @@
 /* file.c: Implementation of memory backed file object (mmaped object). */
 
 #include "vm/vm.h"
+#include "filesys/file.h"
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -23,9 +24,18 @@ vm_file_init (void) {
 bool
 file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	/* Set up the handler */
+	struct page_info* info = page->uninit.aux;
 	page->operations = &file_ops;
 
+	// JH 이후 munmap할 때 편의를 위해 페이지마다 
+	// segment의 첫번째 페이지인지, 앞으로 남은 페이지가 몇 개인지,
+	// 어떤 파일에 어디서부터 저장할 지에 대한 정보를 추가 저장.
 	struct file_page *file_page = &page->file;
+	file_page->is_first = info->first;
+	file_page->left_page = info->left_page;
+	file_page->file = info->file;
+	file_page->ofs = info->ofs;
+	file_page->act_read_bytes = info->read_bytes;
 }
 
 /* Swap in the page by read contents from the file. */
@@ -43,45 +53,96 @@ file_backed_swap_out (struct page *page) {
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
+	// do_munmap()에서 destroy_and_free_spt_entry()를 호출하면 이 함수가 호출 됨
+	// 만약 memory에 load한 content가 수정된 적이 있다면(pml4_is_dirty()로 확인),
+	// 그 내용을 파일에 다시 적어줘야하고, 아니라면 memory만 0으로 초기화 시켜주면 됨.
+	struct file_page *file_page = &page->file;
+	if (pml4_is_dirty(thread_current()->pml4, page->va)) {	// 만약 수정한 이력이 있다면
+		file_seek(file_page->file, file_page->ofs);
+		file_write(file_page->file, page->va, file_page->act_read_bytes);
+	}
+	memset(page->va, 0, PGSIZE);
+
+	if(page->frame)
+		free(page->frame);
+}
+aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
+
+/* Do the mmap */
+void *
+do_mmap (void *addr, size_t length, int writable,
+		struct file *file, off_t offset) {
+	// JH 3-4-2 mmap에서 사용할 do_mmap 구현
+	// mapping의 범위가 이미 존재하고 있던 page를 덮어버리려고 하는 경우 실패 -> NULL 리턴
+	// load_segment와 유사한 과정
+	ASSERT(addr != NULL);
+	ASSERT(length != 0);
+	ASSERT(file != NULL);
+	ASSERT(pg_round_down(addr) == addr);
+
+	bool first = true;
+
+	void* tmp_addr = addr;
+	// read_bytes : 총 읽어야할 byte의 수
+	uint32_t read_bytes = length > file_length(file) ? file_length(file) : length;
+	// zero_bytes : page 단위로 맞춰야하기 때문에 남는 공간을 채울 0의 byte 수
+	uint32_t zero_bytes = pg_round_up(read_bytes) - read_bytes;
+	// page_num 앞으로 할당할 page(or frame)의 수
+	int page_num = pg_round_up(read_bytes)/PGSIZE - 1;
+
+	// 앞으로 넣을 공간에 이미 어떤 데이터가 있는 지 미리 확인
+	for (i = 0; i <= page_num; i++) {
+		if(spt_find_page(&thread_current()->spt, addr + i*PGSIZE))
+			return NULL;
+	}
+
+	while(read_bytes > 0 || zero_bytes > 0) {
+		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+		struct page_info * aux = (struct page_info *) malloc(sizeof(struct page_info));
+		// 값 할당 과정
+		aux->file = file;
+		aux->ofs = offset;
+		offset += page_read_bytes;
+		aux->read_bytes = page_read_bytes;
+		aux->zero_bytes = page_zero_bytes;
+		aux->first = first;
+		if (first)
+			first = false;
+		aux->left_page = page_num;
+		page_num -= 1;
+
+		if (!vm_alloc_page_with_initializer (VM_FILE, tmp_addr,
+					writable, lazy_load_segment, aux))
+			return NULL;
+		
+		/* Advance. */
+		read_bytes -= page_read_bytes;
+		zero_bytes -= page_zero_bytes;
+		tmp_addr += PGSIZE;
+	}
+	return addr;
 }
 
-// /* Do the mmap */
-// void *
-// do_mmap (void *addr, size_t length, int writable,
-// 		struct file *file, off_t offset) {
-// 	// JH 3-4-2 mmap에서 사용할 do_mmap 구현
-// 	// mapping의 범위가 이미 존재하고 있던 page를 덮어버리려고 하는 경우 실패 -> NULL 리턴
-// 	// load_segment와 유사한 과정
-// 	ASSERT(addr != NULL);
-// 	ASSERT(length != 0);
-// 	ASSERT(file != NULL);
-// 	ASSERT(pg_round_down(addr) == addr);
+/* Do the munmap */
+void
+do_munmap (void *addr) {
+	struct supplemental_page_table * spt = &thread_current()->spt;
+	struct page * first_page_to_munmap = spt_find_page(spt, addr);
 
-// 	void * tmp_addr = addr;
-// 	uint32_t read_bytes = length > file_length(file) ? file_length(file) : length;
-// 	uint32_t zero_bytes = pg_round_up(read_bytes) - read_bytes;
+	struct file* file = file_reopen(first_page_to_munmap->file.file);
 
-// 	while(read_bytes > 0 || zero_bytes > 0) {
-// 		size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-// 		size_t page_zero_bytes = PGSIZE - page_read_bytes;
+	ASSERT(pg_round_down(addr) == addr);
+	ASSERT(first_page_to_munmap->file.is_first);
 
-// 		struct () * aux = () malloc(sizeof());
-// 		// 값 할당 과정
-// 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-// 					writable, lazy_load_segment, aux))
-// 			return NULL;
-		
-// 		/* Advance. */
-// 		read_bytes -= page_read_bytes;
-// 		zero_bytes -= page_zero_bytes;
-// 		addr += PGSIZE;
-// 		offset += page_read_bytes;
-// 	}
-// 	return save_addr;
-// }
-
-// /* Do the munmap */
-// void
-// do_munmap (void *addr) {
-// }
+	int num_to_munmap = first_page_to_munmap->file.left_page;
+	for(int i = 0; i <= num_to_munmap; i++) {
+		struct page * delete_page = spt_find_page(spt, addr + i*PGSIZE);
+		if(page)
+			PANIC("There is no mmap page!");
+		hash_delete(&spt->table, &delete_page->hash_elem);
+		destroy_and_free_spt_entry(&delete_page->hash_elem, NULL);
+	}
+	file_close(file);
+}

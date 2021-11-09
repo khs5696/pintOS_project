@@ -16,6 +16,10 @@ struct page_info {
     off_t ofs;
     uint32_t read_bytes;
     uint32_t zero_bytes;
+    //For file_page
+    bool first;
+    int left_page;
+
 };
 
 #endif /* userprog/process.h */

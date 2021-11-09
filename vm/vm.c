@@ -48,6 +48,7 @@ static struct frame *vm_evict_frame (void);
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
+// JH do_mmap에서 vm_alloc_page_with_initializer(VM_FILE, tmp_addr, writable, lazy_load_segment, aux) 로 호출됨
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
@@ -56,8 +57,8 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
-		// if(aux != NULL)
-		// 	printf("file length in vm_alloc_page_with_initializer aux->file %d\n", file_length(((struct page_info *)aux)->file));
+	// if(aux != NULL)
+	// 	printf("file length in vm_alloc_page_with_initializer aux->file %d\n", file_length(((struct page_info *)aux)->file));
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
@@ -70,7 +71,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		// malloc을 사용해 새로운 page를 할당
 		struct page* new_page = (struct page *) malloc(sizeof(struct page));
-		ASSERT(new_page);
+		// JH 이거 원래 ASSERT였음
+		if(new_page == NULL)
+			return false;
 
 		// vm_type에 맞는 initializer을 준비
 		bool (*initializer)(struct page *, enum vm_type, void *);
@@ -420,7 +423,8 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	return success;
 }
 
-void destroy_and_free_spt_entry(struct hash_elem *e, void *aux){
+void
+destroy_and_free_spt_entry(struct hash_elem *e, void *aux) {
 	struct page* p = hash_entry(e, struct page, hash_elem);
 	// vm_dealloc_page() : destroy(page) 하고 free(page) 다 해줌.
 	vm_dealloc_page(p);
