@@ -426,7 +426,7 @@ munmap (void *addr) {
 	struct page * p = spt_find_page(&thread_current()->spt, addr);
 	if (p)	// spt에서 찾았는데 없는 경우 -> 잘못된 addr 주소
 		return;
-	if (p->operations.type != VM_FILE || !p->file.is_first)	// page의 type이 VM_FILE이 아니거나, 해당 페이지가 처음 페이지가 아닌 경우
+	if (p->operations->type != VM_FILE || !p->file.is_first)	// page의 type이 VM_FILE이 아니거나, 해당 페이지가 처음 페이지가 아닌 경우
 		return;
 
   	do_munmap(addr);

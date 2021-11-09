@@ -17,14 +17,15 @@ Executing 'mmap-zero':
 (mmap-zero) create empty file "empty"
 (mmap-zero) open "empty"
 (mmap-zero) mmap "empty"
+mmap-zero: exit(-1)
 Execution of 'mmap-zero' complete.
-Timer: 66 ticks
-Thread: 36 idle ticks, 27 kernel ticks, 3 user ticks
+Timer: 70 ticks
+Thread: 35 idle ticks, 32 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 106 reads, 246 writes
 hd1:0: 103 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1001 characters output
+Console: 1021 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

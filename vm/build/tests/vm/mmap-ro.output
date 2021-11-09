@@ -17,14 +17,16 @@ Executing 'mmap-ro':
 (mmap-ro) begin
 (mmap-ro) open "large.txt"
 (mmap-ro) mmap "large.txt" with writable=0
+(mmap-ro) about to write into read-only mmap'd memory
+mmap-ro: exit(-1)
 Execution of 'mmap-ro' complete.
 Timer: 199 ticks
-Thread: 88 idle ticks, 109 kernel ticks, 2 user ticks
+Thread: 96 idle ticks, 100 kernel ticks, 3 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 111 reads, 8074 writes
 hd1:0: 4018 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1034 characters output
+Console: 1106 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...

@@ -3,6 +3,7 @@
     "C_Cpp.errorSquiggles": "Disabled",
     "files.associations": {
         "process.h": "c",
-        "palloc.h": "c"
+        "palloc.h": "c",
+        "file.h": "c"
     }
 }

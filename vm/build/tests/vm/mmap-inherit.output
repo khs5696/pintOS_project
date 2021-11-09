@@ -18,14 +18,20 @@ Executing 'mmap-inherit':
 (mmap-inherit) begin
 (mmap-inherit) open "sample.txt"
 (mmap-inherit) mmap "sample.txt"
+(mmap-inherit) exec "child-inherit"
+(child-inherit) begin
+child-inherit: exit(-1)
+(mmap-inherit) checking that mmap'd file still has same data
+(mmap-inherit) end
+mmap-inherit: exit(0)
 Execution of 'mmap-inherit' complete.
-Timer: 65 ticks
-Thread: 35 idle ticks, 29 kernel ticks, 1 user ticks
+Timer: 77 ticks
+Thread: 36 idle ticks, 36 kernel ticks, 5 user ticks
 hd0:0: 0 reads, 0 writes
-hd0:1: 143 reads, 478 writes
+hd0:1: 209 reads, 478 writes
 hd1:0: 215 reads, 0 writes
 hd1:1: 0 reads, 0 writes
-Console: 1124 characters output
+Console: 1308 characters output
 Keyboard: 0 keys pressed
 Exception: 0 page faults
 Powering off...
