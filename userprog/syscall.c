@@ -299,16 +299,13 @@ read (int fd, const void *buffer, unsigned size) {
 		return actually_read_byte;
 	} else if (fd >= 3) {
 		struct file * read_file = find_file_by_fd(fd);
-
 		
 		if(spt_find_page(&thread_current()->spt, buffer) != NULL && spt_find_page(&thread_current()->spt, buffer)->writable == 0)
 			exit(-1);
 
 		if (read_file != NULL) {
 			lock_acquire(&file_synch_lock);
-			// printf("a\n");
 			actually_read_byte = file_read(read_file, buffer, size);
-			// printf("b\n");
 			lock_release(&file_synch_lock);
 			return actually_read_byte;
 		} else {
@@ -407,12 +404,15 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// find_file_by_fd로 fd_list에서 fd 찾기 -> 없으면 NULL (v)
 	// file_reopen을 해주는데 fd로 찾아지면 그걸 굳이 또 reopen을 해야하나...? 라는 생각
 	// file_size가 offset보다 작은 경우 false (v)
-	if (is_kernel_vaddr(addr)) {
+	if (is_kernel_vaddr(addr))
 		return NULL;
-	}
-	if (addr == NULL || length <= 0 || fd < 2)	// addr가 NULL이거나 length가 0이거나 STDIN&OUT을 mapping 하려고 하면 return NULL
+	if (addr == NULL || length <= 0 || fd < 2)	// addr가 NULL이거나 length가 0보다 작거나 STDIN&OUT을 mapping 하려고 하면 return NULL
+		return NULL;
+	if (length >= KERN_BASE)	// mmap-kernel case 해결
 		return NULL;
 	if (pg_round_down(addr) != addr)	// addr가 page-aligned되어 들어오지 않은 경우 return NULL
+		return NULL;
+	if (pg_round_down(offset) != offset)
 		return NULL;
 
 	struct file * file = find_file_by_fd(fd);
