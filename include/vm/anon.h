@@ -1,6 +1,7 @@
 #ifndef VM_ANON_H
 #define VM_ANON_H
 #include "vm/vm.h"
+#include "threads/synch.h"
 // #include "userprog/process.h"
 
 struct page;
@@ -11,6 +12,11 @@ struct anon_page {
 	enum vm_type type;
 	struct page_info *aux;
   	int swap_idx;
+};
+
+struct swap_table {
+	struct lock lock;
+	struct bitmap * bitmap;
 };
 
 void vm_anon_init (void);

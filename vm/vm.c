@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include "userprog/process.h"
 
+struct list victim_table;
+
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -23,6 +25,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&victim_table);
 
 }
 
@@ -150,20 +153,35 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 /* Get the struct frame, that will be evicted. */
 static struct frame *
 vm_get_victim (void) {
-	struct frame *victim = NULL;
 	 /* TODO: The policy for eviction is up to you. */
+	uint64_t* pml4 = thread_current()->pml4;
+	struct frame *victim = NULL;
+	struct list_elem* victim_elem = list_front(&victim_table);
+	while(1){
+		struct page* page = list_entry (victim_elem, struct page, victim_elem);
 
-	return victim;
+		if (pml4_is_accessed(pml4, page->va)){
+			pml4_set_accessed(pml4, page->va, 0);
+			victim_elem = list_next(victim_elem);
+			if(victim_elem == list_end (&victim_table))
+				victim_elem = list_begin (&victim_table);
+		}
+		else{
+			list_remove(victim_elem);
+			return page->frame;
+		}
+	}
 }
 
 /* Evict one page and return the corresponding frame.
  * Return NULL on error.*/
 static struct frame *
 vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
+	struct frame *victim = vm_get_victim ();
 	/* TODO: swap out the victim and return the evicted frame. */
-
-	return NULL;
+	ASSERT(swap_out(victim->page));
+	victim->page = NULL;
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -178,8 +196,7 @@ vm_get_frame (void) {
 	// vm_do_claim_page()에서 호출되어, palloc_get_page()로 물리 메모리 할당
 	void* new_frame = palloc_get_page(PAL_USER);
 	if(new_frame == NULL)
-		//return vm_evict_frame();
-		PANIC("TODO");
+		return vm_evict_frame();
 
 	frame = (struct frame *) malloc(sizeof(struct frame));
 	if (frame == NULL) 
@@ -339,7 +356,7 @@ vm_do_claim_page (struct page *page) {
 	// swap_in : 페이지의 타입이 uninit이면 uninit_initialize(page, frame->kva) 호출
 	// 페이지 타입에 따라 페이지를 초기화하고 
 	// lazy_load_segment()를 호출해 disk에 있는 file을 물리메모리로 로드
-	// list_push_back (&victim_table, &page->victim_elem);
+	list_push_back (&victim_table, &page->victim_elem);
 	// printf("uninit_initialize start\n");
 
 	return swap_in (page, frame->kva);

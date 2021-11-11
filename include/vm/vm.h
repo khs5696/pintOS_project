@@ -52,6 +52,7 @@ struct page {
 	bool writable;
 	enum vm_type vm_type;
 	struct hash_elem hash_elem; 
+	struct list_elem victim_elem;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */

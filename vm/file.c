@@ -39,51 +39,6 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 	file_page->act_read_bytes = info->read_bytes;
 }
 
-/* Swap in the page by read contents from the file. */
-static bool
-file_backed_swap_in (struct page *page, void *kva) {
-	struct file_page *file_page UNUSED = &page->file;
-	// 3-5-6. file-backed page의 swap_in 구현
-	// 그냥 page에 저장된 file에 대한 정보 가지고 kva에 다시 lazy_load_segment하면 될 듯?
-}
-
-/* Swap out the page by writeback contents to the file. */
-static bool
-file_backed_swap_out (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
-	// 3-5-5. file-backed page의 swap_out 구현
-	// vm_do_claim_page()에서 호출됨
-	// file_backed_destroy와 비슷하게 dirty_bit 확인하고 file_seek, file_write
-	// page가 수정된 이력이 있는지 확인해서 만약 없다면, 굳이 파일에 덮어쓰기 할 필요 없음
-	// -> pml4_is_dirty(uint64_t *pml4, const void *vpage)
-	//	  : "pml4"에서 "vpage"에 해당하는 PTE의 dirty bit 확인
-	// pml4에서 해당 PTE의 dirty_bit를 다시 0으로 만들어 줘야함.
-	// -> pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty)
-	//	  : "pml4"의 "vpage"에 해당하는 PTE의 dirty_bit를 "dirty"로 변경
-	// pml4에서 해당 페이지 지우기 & page->frame NULL로 변경
-	// -> pml4_clear_page (uint64_t *pml4, void *upage)
-	//	  : "pml4"의 "upage"의 not_present를 true로 변경해주는 함수
-}
-
-/* Destory the file backed page. PAGE will be freed by the caller. */
-static void
-file_backed_destroy (struct page *page) {
-	// do_munmap()에서 destroy_and_free_spt_entry()를 호출하면 이 함수가 호출 됨
-	// 만약 memory에 load한 content가 수정된 적이 있다면(pml4_is_dirty()로 확인),
-	// 그 내용을 파일에 다시 적어줘야하고, 아니라면 memory만 0으로 초기화 시켜주면 됨.
-	struct file_page *file_page = &page->file;
-	if (pml4_is_dirty(thread_current()->pml4, page->va)) {	// 만약 수정한 이력이 있다면
-		file_seek(file_page->file, file_page->ofs);
-		file_write(file_page->file, page->va, file_page->act_read_bytes);
-	}
-	memset(page->va, 0, PGSIZE);
-
-	if(page->frame != NULL)
-		free(page->frame);
-	// free(file_page);
-}
-// aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
-
 
 
 static bool
@@ -113,6 +68,76 @@ lazy_load_segment (struct page *page, void *aux) {
 	free(aux);
 	return true;
 }
+
+/* Swap in the page by read contents from the file. */
+static bool
+file_backed_swap_in (struct page *page, void *kva) {
+	struct file_page *file_page UNUSED = &page->file;
+	// 3-5-6. file-backed page의 swap_in 구현
+	// 그냥 page에 저장된 file에 대한 정보 가지고 kva에 다시 lazy_load_segment하면 될 듯?
+	struct page_info * tmp = (struct page_info *)malloc(sizeof(struct page_info));
+	tmp->file = file_page->file;
+	tmp->ofs = file_page->ofs;
+	tmp->read_bytes = file_page->act_read_bytes;
+	tmp->zero_bytes = PGSIZE - file_page->act_read_bytes;
+	tmp->first = file_page->is_first;
+	tmp->left_page = file_page->left_page;
+
+	return lazy_load_segment(page,  (void *)tmp);
+}
+
+/* Swap out the page by writeback contents to the file. */
+static bool
+file_backed_swap_out (struct page *page) {
+	// 3-5-5. file-backed page의 swap_out 구현
+	// vm_do_claim_page()에서 호출됨
+	// file_backed_destroy와 비슷하게 dirty_bit 확인하고 file_seek, file_write
+	// page가 수정된 이력이 있는지 확인해서 만약 없다면, 굳이 파일에 덮어쓰기 할 필요 없음
+	// -> pml4_is_dirty(uint64_t *pml4, const void *vpage)
+	//	  : "pml4"에서 "vpage"에 해당하는 PTE의 dirty bit 확인
+	// pml4에서 해당 PTE의 dirty_bit를 다시 0으로 만들어 줘야함.
+	// -> pml4_set_dirty (uint64_t *pml4, const void *vpage, bool dirty)
+	//	  : "pml4"의 "vpage"에 해당하는 PTE의 dirty_bit를 "dirty"로 변경
+	// pml4에서 해당 페이지 지우기 & page->frame NULL로 변경
+	// -> pml4_clear_page (uint64_t *pml4, void *upage)
+	//	  : "pml4"의 "upage"의 not_present를 true로 변경해주는 함수
+	ASSERT(page);
+
+	struct file_page *file_page UNUSED = &page->file;
+
+	if (pml4_is_dirty(thread_current()->pml4,page->va)){
+		file_seek(file_page->file, file_page->ofs);
+		file_write(file_page->file, page->va, file_page->act_read_bytes);
+		pml4_set_dirty(thread_current()->pml4, page->va, 0); //?
+	} 
+
+	pml4_clear_page(thread_current()->pml4, page->va);
+	
+	page->frame = NULL;
+
+	return true;
+}
+
+/* Destory the file backed page. PAGE will be freed by the caller. */
+static void
+file_backed_destroy (struct page *page) {
+	// do_munmap()에서 destroy_and_free_spt_entry()를 호출하면 이 함수가 호출 됨
+	// 만약 memory에 load한 content가 수정된 적이 있다면(pml4_is_dirty()로 확인),
+	// 그 내용을 파일에 다시 적어줘야하고, 아니라면 memory만 0으로 초기화 시켜주면 됨.
+	struct file_page *file_page = &page->file;
+	if (pml4_is_dirty(thread_current()->pml4, page->va)) {	// 만약 수정한 이력이 있다면
+		file_seek(file_page->file, file_page->ofs);
+		file_write(file_page->file, page->va, file_page->act_read_bytes);
+	}
+	memset(page->va, 0, PGSIZE);
+
+	if(page->frame != NULL)
+		free(page->frame);
+	// free(file_page);
+}
+// aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
+
+
 
 /* Do the mmap */
 void *
