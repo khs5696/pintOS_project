@@ -35,7 +35,7 @@ vm_anon_init (void) {
 	uint64_t bit_cnt = swap_disk_size/8;
 
 	// struct bitmap * bitmap_create (size_t bit_cnt)
-	swap_table.bitmap = bitmap_create(bit_cnt);
+	swap_table.bit_map = bitmap_create(bit_cnt);
 	lock_init(&swap_table.lock);
 }
 
@@ -50,7 +50,7 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 	// swap_table에서 index를 나타내고, -1은 초기화가 아직 되지 않은 상태를 의미하는 것 같은데,
 	// 이 방법 말고 0으로 한 다음에 index는 1부터 시작하고 나중에 swap_table에서 검색할 때는 무조건 swap_idx - 1
 	// 로 검색하게 해도 되지 않을까....?
-	anon_page->swap_idx = 7777;
+	anon_page->swap_idx = 10000;
 	return true;
 }
 
@@ -72,7 +72,7 @@ anon_swap_in (struct page *page, void *kva) {
 	for(int i = 0; i < 8; i++){
 		disk_read(swap_disk, bitmap_idx * 8 + i, page->frame->kva + PGSIZE_d8 * i);
 	}
-	bitmap_set_multiple(swap_table.bitmap, bitmap_idx, 1, false);
+	bitmap_set_multiple(swap_table.bit_map, bitmap_idx, 1, false);
 	return true;
 }
 
@@ -93,7 +93,7 @@ anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
 
 	lock_acquire (&swap_table.lock);
-	size_t swap_idx = bitmap_scan_and_flip (swap_table.bitmap, 0, 1, false);
+	size_t swap_idx = bitmap_scan_and_flip (swap_table.bit_map, 0, 1, false);
 	anon_page->swap_idx = swap_idx;
 	lock_release (&swap_table.lock);
 	

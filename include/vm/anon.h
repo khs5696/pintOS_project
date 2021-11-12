@@ -17,8 +17,9 @@ struct anon_page {
 
 struct swap_table {
 	struct lock lock;
-	struct bitmap * bitmap;
+	struct bitmap * bit_map;
 };
+
 
 void vm_anon_init (void);
 bool anon_initializer (struct page *page, enum vm_type type, void *kva);
