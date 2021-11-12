@@ -271,7 +271,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	// return vm_do_claim_page (page);
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 
-	if(is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
+	if(user && is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
     	return false;
 	// JH f로 들어온 intr_frame이 kernel에서 발생했을 수도 있기 때문에? user의 stack pointer를 가져오기 위함.
 	// save_rsp (x) thread_current()->fork_intr.rsp (o)
@@ -284,7 +284,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		// printf("find page's va in vm_try_handler_fault : %p\n", page->va);
 		// JH read_only page에 write하려고 했던 경우?
 		if (page->writable == 0 && write) {
-			// printf("page writable false\n");
+			printf("page writable false\n");
 			return false;
 		}
 		// printf("D\n");

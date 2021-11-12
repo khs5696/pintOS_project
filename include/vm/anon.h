@@ -2,6 +2,7 @@
 #define VM_ANON_H
 #include "vm/vm.h"
 #include "threads/synch.h"
+#include <bitmap.h>
 // #include "userprog/process.h"
 
 struct page;

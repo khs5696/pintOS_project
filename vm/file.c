@@ -72,7 +72,8 @@ lazy_load_segment (struct page *page, void *aux) {
 /* Swap in the page by read contents from the file. */
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
-	struct file_page *file_page UNUSED = &page->file;
+	printf("we start swap in!\n");
+	struct file_page *file_page = &page->file;
 	// 3-5-6. file-backed page의 swap_in 구현
 	// 그냥 page에 저장된 file에 대한 정보 가지고 kva에 다시 lazy_load_segment하면 될 듯?
 	struct page_info * tmp = (struct page_info *)malloc(sizeof(struct page_info));
@@ -129,10 +130,14 @@ file_backed_destroy (struct page *page) {
 		file_seek(file_page->file, file_page->ofs);
 		file_write(file_page->file, page->va, file_page->act_read_bytes);
 	}
+	printf("file write is over\n");
+	printf("%p\n", page->va);
 	memset(page->va, 0, PGSIZE);
-
-	if(page->frame != NULL)
+	printf("set memory to zero\n");
+	if(page->frame != NULL) {
 		free(page->frame);
+		printf("free the frame connected to page\n");
+	}
 	// free(file_page);
 }
 // aux로 사용한 것들 page에 저장했으면 free 해줘야함!!!!!!
