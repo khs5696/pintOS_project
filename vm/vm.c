@@ -309,7 +309,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	void * stack_pointer = NULL;
 	void * user_rsp = thread_current()->user_stack_pointer;
 
-	if(is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
+	if(user && is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
     	return false;
 	// JH f로 들어온 intr_frame이 kernel에서 발생했을 수도 있기 때문에? user의 stack pointer를 가져오기 위함.
 	// user_stack_pointer (x) thread_current()->fork_intr.rsp (o)

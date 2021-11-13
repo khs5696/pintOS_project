@@ -379,6 +379,7 @@ process_wait (tid_t child_tid UNUSED) {
 			result = child_thread->exit_status;
 			list_remove(index_elem);
 			sema_up(&child_thread->exit_child_sema);
+			sema_down(&child_thread->waiting_child_sema);
 			
 			return result;
 		}
@@ -424,6 +425,7 @@ process_exit (void) {
 	// HS 2-7-4. process_wait()에서 부모 스레드에게 exit_status를 전달하기 전까지는
 	// 자식 스레드의 메모리가 삭제되지 않아야하므로 sema_down()
 	sema_down(&curr->exit_child_sema);
+	sema_up(&curr->waiting_child_sema);
 
 	// HS 2-7-6. 스레드의 리소스 정리
 	process_cleanup ();

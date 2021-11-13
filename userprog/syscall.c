@@ -125,6 +125,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_CLOSE:
 			close(f->R.rdi);
 			break;
+#ifdef VM
 		case SYS_MMAP:
 			f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
 			break;
@@ -132,6 +133,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			// check_address(f->R.rdi);
 			munmap(f->R.rdi);
 			break;
+#endif
 		default:
 			thread_exit();
 			break;
@@ -298,10 +300,12 @@ read (int fd, const void *buffer, unsigned size) {
 		return actually_read_byte;
 	} else if (fd >= 3) {
 		struct file * read_file = find_file_by_fd(fd);
-		
+
+		#ifdef VM
 		if(spt_find_page(&thread_current()->spt, buffer) != NULL && spt_find_page(&thread_current()->spt, buffer)->writable == 0)
 			exit(-1);
-
+		#endif
+		
 		if (read_file != NULL) {
 			lock_acquire(&file_synch_lock);
 			actually_read_byte = file_read(read_file, buffer, size);
@@ -386,7 +390,7 @@ close (int arg_fd) {
 		exit(-1);
 	}
 }
-
+#ifdef VM
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// JH 3-4-1 system call mmap 구현
@@ -442,7 +446,7 @@ munmap (void *addr) {
   	do_munmap(addr);
 
 }
-
+#endif
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	int fd_a = list_entry(a, struct fd_elem, elem)->fd;
 	int fd_b = list_entry(b, struct fd_elem, elem)->fd;
