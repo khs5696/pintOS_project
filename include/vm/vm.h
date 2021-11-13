@@ -50,9 +50,9 @@ struct page {
 	/* Your implementation */
 	/* HS 3-1-0. supplemental page table 자료 구조 선언 (hash table) */
 	bool writable;
-	enum vm_type vm_type;
-	struct hash_elem hash_elem; 
-	struct list_elem victim_elem;
+	enum vm_type vm_page_type;
+	struct hash_elem hash_page_elem; 
+	struct list_elem victim_page_elem;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */

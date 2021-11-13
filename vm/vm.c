@@ -101,7 +101,7 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		uninit_new(new_page, upage, init, type, aux, page_type_init);	// uninit으로 초기화
 
 		// new_page 관련 변수 업데이트
-		new_page->vm_type = type;		// 페이지의 실제 타입 (초기에는 uninit)
+		new_page->vm_page_type = type;		// 페이지의 실제 타입 (초기에는 uninit)
 		new_page->writable = writable;	// 수정 가능 여부
 
 		/* TODO: Insert the page into the spt. */
@@ -129,10 +129,10 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
 	// supplemental page table에서 va에 해당하는 struct page 탐색
 	// struct hash_elem *hash_find (struct hash *, struct hash_elem *)
-	struct hash_elem * find_hash_elem = hash_find(&thread_current()->spt.table, &tmp_page.hash_elem);
+	struct hash_elem * find_hash_elem = hash_find(&thread_current()->spt.table, &tmp_page.hash_page_elem);
 
 	if (find_hash_elem)
-		return hash_entry(find_hash_elem, struct page, hash_elem);
+		return hash_entry(find_hash_elem, struct page, hash_page_elem);
 	else
 		return NULL;
 }
@@ -146,7 +146,7 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 	/* HS 3-1-3. page(VM_UNINIT) 생성 및 spt에 삽입 */
 	// 해당 virtual address가 이미 존재하고 있는지를 확인해야한다
 	// struct hash_elem *hash_insert (struct hash *, struct hash_elem *)
-	if (hash_insert(&spt->table, &page->hash_elem) == NULL)
+	if (hash_insert(&spt->table, &page->hash_page_elem) == NULL)
 		succ = true;
 	return succ;
 }
@@ -174,7 +174,7 @@ vm_get_victim (void) {
 	victim_page_elem = head_page_elem;
 
 	while (1) {
-		victim_page = list_entry (victim_page_elem, struct page, victim_elem);
+		victim_page = list_entry (victim_page_elem, struct page, victim_page_elem);
 
 		bool check_access = pml4_is_accessed(&thread_current()->pml4, victim_page->va);
 		// 해당 페이지를 아직 접근하지 않은 경우 (access bit = 0)
@@ -393,7 +393,7 @@ vm_do_claim_page (struct page *page) {
 	// swap_in : 페이지의 타입이 uninit이면 uninit_initialize(page, frame->kva) 호출
 	// 페이지 타입에 따라 페이지를 초기화하고 
 	// lazy_load_segment()를 호출해 disk에 있는 file을 물리메모리로 로드
-	list_push_back (&victim_table, &page->victim_elem);
+	list_push_back (&victim_table, &page->victim_page_elem);
 
 	return swap_in (page, frame->kva);
 }
@@ -403,15 +403,15 @@ uint64_t
 make_page_hash (const struct hash_elem *e, void *aux) {
 	const struct page * find_page;
 
-	find_page = hash_entry(e, struct page, hash_elem);
+	find_page = hash_entry(e, struct page, hash_page_elem);
 	return hash_bytes(&find_page->va, sizeof(find_page->va));
 }
 
 // hash_less_func : hash element 들의 크기를 비교해주는 함수의 포인터 -> hash_find()에서 사용
 bool 
 compare_by_page_va (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
-	struct page* page_a = hash_entry(a, struct page, hash_elem);
-	struct page* page_b = hash_entry(b, struct page, hash_elem);
+	struct page* page_a = hash_entry(a, struct page, hash_page_elem);
+	struct page* page_b = hash_entry(b, struct page, hash_page_elem);
 
 	return page_a->va < page_b->va;
 }
@@ -448,7 +448,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 	hash_first (&index, &src->table);
 
 	while (hash_next (&index)) {	// spt의 처음부터 끝까지 순회
-		tmp_page = hash_entry (hash_cur(&index), struct page, hash_elem);
+		tmp_page = hash_entry (hash_cur(&index), struct page, hash_page_elem);
 		tmp_page_type = tmp_page->operations->type;		// uninit이 아닌 실제 페이지 타입
 
 		switch (VM_TYPE(tmp_page_type)) {
@@ -458,7 +458,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 				tmp_page_info = (struct page_info *) malloc (sizeof(struct page_info));
 				memcpy(tmp_page_info, tmp_page->uninit.aux, sizeof(struct page_info));	// page_info 복제
 				// 자식 스레드의 spt에 page 복제
-				if (!vm_alloc_page_with_initializer(tmp_page->vm_type, tmp_page->va, tmp_page->writable, tmp_page->uninit.init, tmp_page_info))
+				if (!vm_alloc_page_with_initializer(tmp_page->vm_page_type, tmp_page->va, tmp_page->writable, tmp_page->uninit.init, tmp_page_info))
 					result = false;
 				break;
 
@@ -482,7 +482,7 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 				tmp_page_info->first = tmp_page->file.is_first;
 				tmp_page_info->left_page = tmp_page->file.left_page;
 
-				if (!vm_alloc_page_with_initializer(tmp_page->vm_type, tmp_page->va, tmp_page->writable, NULL, tmp_page_info))
+				if (!vm_alloc_page_with_initializer(tmp_page->vm_page_type, tmp_page->va, tmp_page->writable, NULL, tmp_page_info))
 					result = false;
 				break;
 
@@ -521,7 +521,7 @@ void
 destroy_and_free_spt_entry(struct hash_elem *e, void *aux) {
 	struct page* destroy_page;
 
-	destroy_page = hash_entry(e, struct page, hash_elem);	// hash_elem을 page 구조체 형태로 변형
+	destroy_page = hash_entry(e, struct page, hash_page_elem);	// hash_elem을 page 구조체 형태로 변형
 	// vm_dealloc_page() : destroy(page) 하고 free(page) 다 해줌.
 	vm_dealloc_page(destroy_page);
 }

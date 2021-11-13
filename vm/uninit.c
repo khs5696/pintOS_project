@@ -57,6 +57,7 @@ uninit_initialize (struct page *page, void *kva) {
 	// 때문에 이 경우 init과 aux가 NULL인 상태!
 	vm_initializer *init = uninit->init;
 	struct page_info * aux = uninit->aux;
+
 	// if (aux != NULL) {
 	// 	printf("file length in uninit_initialize uninit->aux->file %d\n", file_length( ((struct page_info *)aux)->file ));
 	// }
@@ -80,4 +81,5 @@ uninit_destroy (struct page *page) {
 	/* TODO: Fill this function.
 	 * TODO: If you don't have anything to do, just return. */
 	free(uninit->aux);
+	return;
 }
