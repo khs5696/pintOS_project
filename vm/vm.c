@@ -489,30 +489,6 @@ supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
 			default :
 				break;
 		}
-		// if (VM_TYPE(type) == VM_UNINIT) {
-		// 	// vm_type 이 uninit이라는 것은 아직 한번도 필요하지 않아 lazy load가 되지 않은 상황.
-		// 	// 따라서 해당 페이지를 그대로 복사해오려면 이후 타입에 맞는 initializer까지 넘겨줘야함. -> vm_alloc_page_with_initializer.
-		// 	struct page_info * info = (struct page_info *) malloc(sizeof(struct page_info));
-		// 	memcpy(info, tmp_page->uninit.aux, sizeof(struct page_info));
-		// 	// 자식 스레드의 spt에 page 복제
-		// 	success = vm_alloc_page_with_initializer(tmp_page->vm_type, tmp_page->va, tmp_page->writable, tmp_page->uninit.init, info);
-		// } else if (VM_TYPE(type) == VM_ANON) {
-		// 	// vm_type이 anon인 경우, 이미 initialize가 anon으로 이루어졌고, physical memory에 lazy하게
-		// 	// loading도 이루어졌다는 것을 의미함.
-		// 	// 자식 스레드의 spt에 똑같은 va를 가리킬 page 복제
-		// 	success = vm_alloc_page(VM_ANON|VM_MARKER_0, tmp_page->va, tmp_page->writable);
-		// 	// frame 하나 할당해서 위에 vm_alloc_page로 만든 페이지와 연결 / anon_swap_in 실행
-		// 	vm_claim_page(tmp_page->va);
-		// 	struct page *find_page = spt_find_page (&thread_current()->spt, tmp_page->va);
-		
-		// 	memcpy(find_page->va, tmp_page->frame->kva, PGSIZE);
-		// }
-		// else if(VM_TYPE(type) == VM_FILE){
-		// 	struct page_info* args = (struct page_info*)malloc(sizeof(struct page_info));
-		// 	memcpy(args, page->file.aux, sizeof(struct page_info));
-		// 	success = vm_alloc_page_with_initializer(VM_FILE, page->va, 
-		// 			page->writable, NULL, args);
-		// }
 	}
 	return result;
 }

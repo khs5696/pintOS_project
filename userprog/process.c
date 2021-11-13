@@ -808,16 +808,20 @@ lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
+	uint8_t * pa;
+	int read_byte;
+	struct page_info * info = NULL;
 
 	/* HS 3-2-4. 실제로 page와 연결된 물리 메모리에 데이터 로드 */
 	// uninit.c의 uniuninit_initialize()에서 호출
-	uint8_t* pa = (page->frame)->kva;
-	struct page_info* info = aux;
+	pa = (page->frame)->kva;
+	info = aux;
+
 	// file의 pointer를 info->ofs로 옮김으로써 앞으로 file을 읽을 때
 	// 원하는 위치인 ofs부터 읽도록 만듦.
 	file_seek(info->file, info->ofs);
 
-	int read_byte = file_read (((struct page_info *)info)->file, pa, info->read_bytes);
+	read_byte = file_read (info->file, pa, info->read_bytes);
 	// printf("a %d\n", read_byte);
 	// printf("c %d\n", pa);
 	// printf("b %d\n", (int) info->read_bytes);
@@ -905,18 +909,23 @@ setup_stack (struct intr_frame *if_) {
 	// project 2 ) 프레임 할당 & 데이터(주소 upage의 파일에서 ofs에 위치한 segment - Data & Code)를 로드(mapping)
 	// project 3 ) lazy_loading을 구현하기 위해 새로운 page 구조체를 생성하고 spt에 삽입
 	// stack을 식별할 방법이 필요할 수도 있다. → vm/vm.h의 vm_type에 있는 VM_MARKER_0를 활용 가능
+	bool check_alloc_page = vm_alloc_page(VM_ANON|VM_MARKER_0, stack_bottom, true);
+	bool check_alloc_frame = vm_claim_page(stack_bottom);
+	struct page * alloc_fail_page;
+
 	// 새로운 memory management system에서는 vm_alloc_page 혹은 vm_alloc_page_with_initializer로 페이지를 할당해야한다.
 	// vm_alloc_page(type, upage, writable) == vm_alloc_page_with_initializer (type, upage, writable, NULL, NULL)
 	// 위 두 방법은 lazy loading 방법을 고수하고 있는 반면, 최초 stack은 lazy하게 loading이 될 필요가 없음으로
 	// 바로 vm_do_claim을 호출해서 stack 공간을 확보한다.
-	if(!( vm_alloc_page (VM_ANON|VM_MARKER_0, stack_bottom, true) && vm_claim_page(stack_bottom) )){
-		struct page * p = spt_find_page(&thread_current()->spt,stack_bottom);
-		palloc_free_page(p);
-		PANIC("vm_alloc_page failed");
+	if(!(check_alloc_page) || !(check_alloc_frame)) {
+		alloc_fail_page = spt_find_page(&thread_current()->spt,stack_bottom);
+		palloc_free_page(alloc_fail_page);
+		return success;
 	}
-
 	memset(stack_bottom, 0, PGSIZE);
 	if_->rsp = USER_STACK;
-	return true;
+
+	success = true;
+	return success;
 }
 #endif /* VM */

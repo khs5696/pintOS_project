@@ -402,11 +402,6 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	// addr가 0이면 실패 -> NULL 리턴 (v)
 	// length가 0이면 실패 -> NULL 리턴 (v)
 	// stdin, stdout을 mapping하는 것 금지 (v)
-	// void * do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset);
-
-	// find_file_by_fd로 fd_list에서 fd 찾기 -> 없으면 NULL (v)
-	// file_reopen을 해주는데 fd로 찾아지면 그걸 굳이 또 reopen을 해야하나...? 라는 생각
-	// file_size가 offset보다 작은 경우 false (v)
 	if (is_kernel_vaddr(addr))
 		return NULL;
 	if (addr == NULL || length <= 0 || fd < 2)	// addr가 NULL이거나 length가 0보다 작거나 STDIN&OUT을 mapping 하려고 하면 return NULL
@@ -418,16 +413,19 @@ mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	if (pg_round_down(offset) != offset)
 		return NULL;
 
-	struct file * file = find_file_by_fd(fd);
-	if (!file)	// fd_list에서 file 찾았는데 없으면 NULL 리턴
+	// find_file_by_fd로 fd_list에서 fd 찾기 -> 없으면 NULL (v)
+	// file_reopen을 해주는데 fd로 찾아지면 그걸 굳이 또 reopen을 해야하나...? 라는 생각
+	struct file * find_file = find_file_by_fd(fd);
+	if (!find_file)	// fd_list에서 file 찾았는데 없으면 NULL 리턴
 		return NULL;
-	off_t file_size = file_length(file);
+	
+	// file_size가 offset보다 작은 경우 false (v)
+	off_t file_size = file_length(find_file);
 	if(file_size == 0 || file_size <= offset)	// open된 file의 길이가 0이거나 file의 길이보다 offset이 더 큰 경우 NULL 리턴
 		return NULL;
 	
-	void * page_addr = addr;
-	
-	return do_mmap(addr, length, writable, file, offset);
+	// void * do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset);
+	return do_mmap(addr, length, writable, find_file, offset);
 }
 
 void
@@ -440,7 +438,6 @@ munmap (void *addr) {
 		return;
 	if (p->operations->type != VM_FILE || !p->file.is_first)	// page의 type이 VM_FILE이 아니거나, 해당 페이지가 처음 페이지가 아닌 경우
 		return;
-
 
 	// printf("I'm doing do_munmap\n");
   	do_munmap(addr);
