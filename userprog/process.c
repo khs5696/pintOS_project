@@ -15,7 +15,9 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
@@ -206,9 +208,11 @@ __do_fork (void *aux) {
     * TODO:       the resources of parent.*/
    // 부모 스레드에 저장되어 있는 파일들을 자식 스레드로 복사한다. (file_duplicate() 이용)
 	for (struct list_elem * index_elem = list_begin(parent->fd_list); index_elem != list_end(parent->fd_list); 
-	 index_elem = list_next(index_elem)) {
+		index_elem = list_next(index_elem)) {
 		struct fd_elem * file_element = list_entry(index_elem, struct fd_elem, elem);
+		// lock_acquire(&file_synch_lock);
 		struct file * new_file_element = file_duplicate(file_element->file_ptr);
+		// lock_release(&file_synch_lock);
 
 		if (new_file_element == NULL)		// file_duplicate error
 			goto error;
@@ -235,18 +239,18 @@ __do_fork (void *aux) {
 
 	// HS 2-5-7. do_iret()이 실행되어 인터럽트에 저장되어 있는 부분부터 이어서 실행
 	/* Finally, switch to the newly created process. */
-	if (succ){
+	if (succ) { 
 		if_.R.rax = 0;
 		do_iret (&if_);
 	}
       
 error:
 	// HS 2-5-8. error case
-	sema_up(&current->do_fork_sema);
+	sema_up(&current->waiting_child_sema);
 	// fork부터 do_fork 과정 도중에 실패했을 경우, 프로세스를 복제하는데 실패했음을 표시하고
 	// 부모가 이 사실을 알 수 있도록 기다린 후 종료한다.
 	thread_current()->exit_status = -1;
-	sema_down(&parent->do_fork_sema);
+	sema_down(&parent->waiting_child_sema);
 	
    	thread_exit ();
 }
@@ -395,6 +399,8 @@ process_exit (void) {
 	// HS 2-7-2. process_exit 구현
 	/* 공식 문서 System Calls의 'close' 함수 설명
 	 * process가 exit할 때 해당 process가 open한 file 전부 닫아줘야함 */
+	// if(!lock_held_by_current_thread(&file_synch_lock))
+	// 	lock_acquire(&file_synch_lock);
 	while (!list_empty(curr->fd_list)) {
 		struct fd_elem * tmp = list_entry(list_pop_front(curr->fd_list), struct fd_elem, elem);
 		// if (tmp->file_ptr == curr->exec_file) {
@@ -407,6 +413,7 @@ process_exit (void) {
 		free(tmp);
 	}
 	file_close(curr->exec_file);
+	// lock_release(&file_synch_lock);
 
 	free(curr->fd_list);
 
@@ -437,6 +444,7 @@ process_cleanup (void) {
 	struct thread *curr = thread_current ();
 
 #ifdef VM
+	// printf("supplemental page table kill will be start\n");
 	supplemental_page_table_kill (&curr->spt);
 #endif
 
@@ -454,7 +462,9 @@ process_cleanup (void) {
 		 * that's been freed (and cleared). */
 		curr->pml4 = NULL;
 		pml4_activate (NULL);
+		// printf("A\n");
 		pml4_destroy (pml4);
+		// printf("B\n");
 	}
 }
 
@@ -549,6 +559,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	process_activate (thread_current ());
 
 	/* Open executable file. */
+	// lock_acquire(&file_synch_lock);
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
@@ -650,7 +661,7 @@ done:
 	/* We arrive here whether the load is successful or not. */
 	if (file != thread_current()->exec_file)
 		file_close (file);
-	// file_close (file);
+	// lock_release(&file_synch_lock);
 	return success;
 }
 

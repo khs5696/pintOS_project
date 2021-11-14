@@ -245,5 +245,7 @@ do_munmap (void *addr) {
 		destroy_and_free_spt_entry(&delete_page->hash_page_elem, NULL);
 		index++;
 	}
+	// printf("munmap is finished\n");
 	file_close(dup_file);
+	// printf("close the file\n");
 }
