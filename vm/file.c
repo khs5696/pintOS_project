@@ -135,7 +135,10 @@ file_backed_destroy (struct page *page) {
 		file_seek(file_page->file, file_page->ofs);
 		file_write(file_page->file, page->va, file_page->act_read_bytes);
 	}
+	page->writable = true;
 	memset(page->va, 0, PGSIZE);	// memory를 0으로 초기화
+	hash_delete(&thread_current()->spt.table, &page->hash_page_elem);
+	
 
 	if(page->frame != NULL)
 		free(page->frame);
@@ -238,9 +241,11 @@ do_munmap (void *addr) {
 		if (delete_page == NULL)
 			PANIC("There is no mmap page!");
 
-		hash_delete(&thread_current()->spt.table, &delete_page->hash_page_elem);
+		// hash_delete(&thread_current()->spt.table, &delete_page->hash_page_elem);
 		destroy_and_free_spt_entry(&delete_page->hash_page_elem, NULL);
 		index++;
 	}
+	// printf("munmap is finished\n");
 	file_close(dup_file);
+	// printf("close the file\n");
 }

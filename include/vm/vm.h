@@ -52,6 +52,8 @@ struct page {
 	bool writable;
 	enum vm_type vm_page_type;
 	struct hash_elem hash_page_elem; 
+
+	/* HS 3-6-0. swap-in/out 구현을 위한 자료 구조 선언 (victim table) */
 	struct list_elem victim_page_elem;
 
 	/* Per-type data are binded into the union.
