@@ -235,8 +235,10 @@ __do_fork (void *aux) {
 
 	// HS 2-5-7. do_iret()이 실행되어 인터럽트에 저장되어 있는 부분부터 이어서 실행
 	/* Finally, switch to the newly created process. */
+
+	if_.R.rax = 0;
+
 	if (succ){
-		if_.R.rax = 0;
 		do_iret (&if_);
 	}
       
@@ -337,7 +339,7 @@ process_exec(void *f_name) {
 	*(uint64_t *)_if.rsp = 0;
 
 	_if.R.rdi = argc;
-	_if.R.rsi = (uintptr_t *)_if.rsp + 1;
+	_if.R.rsi = (uint64_t *)_if.rsp + 1;
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
@@ -407,7 +409,7 @@ process_exit (void) {
 		free(tmp);
 	}
 	file_close(curr->exec_file);
-
+	curr->exec_file =NULL;
 	free(curr->fd_list);
 
 	// child_thread_list의 자식 스레드들과의 연결을 끊어준다. Orphan
