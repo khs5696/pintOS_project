@@ -279,8 +279,11 @@ vm_handle_wp (struct page *page UNUSED) {
 bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
-	// printf("vm_try_handle_fault: user = %s, write = %s, not_present = %s\n", user ? "true" : "false", write ? "true" : "false", not_present ? "true" : "false");
-	// printf("addr in vm_try_handle_fault: %p\n", addr);
+	// printf ("Page fault at %p: %s error %s page in %s context.\n",
+	// 		addr,
+	// 		not_present ? "not present" : "rights violation",
+	// 		write ? "writing" : "reading",
+	// 		user ? "user" : "kernel");
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
 	/* HS 3-2-1. 메모리 접근 및 page fault */
@@ -307,7 +310,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 
 	void * stack_pointer = NULL;
-	void * user_rsp = thread_current()->user_stack_pointer;
+	void * user_rsp = thread_current()->fork_intr.rsp;
 
 	if(user && is_kernel_vaddr(addr)) // JH kernel virtual address에 접근하려고 할 때? user에서 발생한 fault인지 봐야하지 않을까?
     	return false;
