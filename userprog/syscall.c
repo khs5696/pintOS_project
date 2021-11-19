@@ -188,7 +188,6 @@ fork (const char *thread_name) {
 				return TID_ERROR;
 			}
 			// HS 2-5-6. 다시 sema_up을 통해 자식이 이후에 정상적으로 do_iret을 할 수 있도록 해주는 역할
-			sema_up(&thread_current()->do_fork_sema);
 		}
     	return child_pid;
 	}

@@ -230,6 +230,9 @@ __do_fork (void *aux) {
 
    	process_init ();
 
+
+	if_.R.rax = 0;
+
 	// HS 2-5-5. 부모 프로세스를 제대로 복제하였음으로, 자신을 그만 기다려도 된다고 신호를 주는 역할
    	sema_up(&current->do_fork_sema);
 	// JH : fork의 제대로된 역할은 부모 프로세스를 그대로 복제하는 자식 프로세스를 만드는 것에서 그쳐야 한다고 생각
@@ -240,7 +243,6 @@ __do_fork (void *aux) {
 	// HS 2-5-7. do_iret()이 실행되어 인터럽트에 저장되어 있는 부분부터 이어서 실행
 	/* Finally, switch to the newly created process. */
 
-	if_.R.rax = 0;
 
 	if (succ){
 		do_iret (&if_);
@@ -378,6 +380,8 @@ process_wait (tid_t child_tid UNUSED) {
 		child_thread = list_entry(index_elem, struct thread, child_elem);
 		if (child_thread->tid == child_tid) {
 			// child_thread가 종료되기 전까지는 실행 중인 스레드가 종료되면 안되므로 sema_down()
+
+			sema_up(&thread_current()->do_fork_sema);
 			sema_down(&child_thread->waiting_child_sema);
 			
 			// HS 2-7-5. child_thread가 종료되면, exit_status를 받아오고 child_thread_list에서 제거
