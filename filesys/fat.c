@@ -109,6 +109,7 @@ fat_close (void) {
 			disk_write (filesys_disk, fat_fs->bs.fat_start + i, bounce);
 			bytes_wrote += bytes_left;
 			free (bounce);
+			
 		}
 	}
 }
