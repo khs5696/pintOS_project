@@ -20,7 +20,7 @@ filesys_init (bool format) {
 	filesys_disk = disk_get (0, 1);
 	if (filesys_disk == NULL)
 		PANIC ("hd0:1 (hdb) not present, file system initialization failed");
-
+	// inode_init : 그냥 list init해주는 게 전부
 	inode_init ();
 
 #ifdef EFILESYS
@@ -101,7 +101,7 @@ filesys_remove (const char *name) {
 
 	return success;
 }
-
+// 4-0-4 할당해주고 생성을 위한 값들을 이전에 설정해줬음으로, 그 값들을 바탕으로 FAT 생성
 /* Formats the file system. */
 static void
 do_format (void) {

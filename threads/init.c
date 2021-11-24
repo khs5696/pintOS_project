@@ -109,6 +109,7 @@ main (void) {
 #ifdef FILESYS
 	/* Initialize file system. */
 	disk_init ();
+	// 4-0-0 file system의 시작
 	filesys_init (format_filesys);
 #endif
 
