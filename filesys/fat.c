@@ -55,6 +55,7 @@ fat_init (void) {
 	fat_fs_init ();
 }
 
+// 4-0-7 do_format으로 FAT를 생성하였고, 이것을 open 해주는 역할.
 void
 fat_open (void) {
 	fat_fs->fat = calloc (fat_fs->fat_length, sizeof (cluster_t));
@@ -135,6 +136,7 @@ fat_create (void) {
 
 	// Set up ROOT_DIR_CLST
 	// ROOT_DIR_CLUSTER(=1) 위치의 FAT 값을 EOChain으로 변경
+	// root directory를 생성?
 	fat_put (ROOT_DIR_CLUSTER, EOChain);
 
 	// Fill up ROOT_DIR_CLUSTER region with 0
@@ -180,6 +182,7 @@ fat_fs_init (void) {
 /* Add a cluster to the chain.
  * If CLST is 0, start a new chain.
  * Returns 0 if fails to allocate a new cluster. */
+ // Warning : 일단 fat_put에 lock관련이 있어서 추가 안했는데, create 시작과 끝에 lock 필요할 수도
 cluster_t
 fat_create_chain (cluster_t clst) {
 	/* TODO: Your code goes here. */

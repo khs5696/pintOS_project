@@ -206,12 +206,13 @@ exec (const char * cmd_line) {
 }
 
 // HS 2-7-0. wait() system call
-int wait(tid_t child_tid) {
+int
+wait (tid_t child_tid) {
     return process_wait(child_tid);
 }
 
 bool
-create(const char *file, unsigned initial_size) {
+create (const char *file, unsigned initial_size) {
 	bool create_result;
 
 	if (file == NULL) { exit(-1); }		// file name error

@@ -9,7 +9,7 @@
 /* A directory. */
 struct dir {
 	struct inode *inode;                /* Backing store. */
-	off_t pos;                          /* Current position. */
+	off_t pos;                          /* Current position.(readdir에서 사용) */
 };
 
 /* A single directory entry. */
