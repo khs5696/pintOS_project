@@ -270,5 +270,9 @@ cluster_to_sector (cluster_t clst) {
 	if (clst == 0)
 		return 0;
 	return fat_fs->data_start + (clst - 1) * SECTORS_PER_CLUSTER;
+}
 
+cluster_t
+sector_to_cluster (disk_sector_t sector) {
+	return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER + 1;
 }

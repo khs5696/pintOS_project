@@ -5,6 +5,7 @@
 #include <string.h>
 #include "filesys/filesys.h"
 #include "filesys/free-map.h"
+#include "filesys/fat.h"
 #include "threads/malloc.h"
 
 /* Identifies an inode. */
@@ -50,15 +51,15 @@ struct inode {
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
-	if (pos < inode->data.length)
+	if (pos < inode->data.length) {
 		// HS. 수정
 		cluster_t tmp = inode->data.start;
-		while(pos > DISK_SECTOR_SIZE) {      
+		while (pos > DISK_SECTOR_SIZE) {      
 			tmp = fat_get(tmp);
 			pos = pos - DISK_SECTOR_SIZE;
 		}
 		return cluster_to_sector(tmp);
-	else
+	} else
 		return -1;
 }
 
@@ -94,6 +95,34 @@ inode_create (disk_sector_t sector, off_t length) {
 		size_t sectors = bytes_to_sectors (length);      // length (byte)를 섹터 단위(개수)로 변환
 		disk_inode->length = length;
 		disk_inode->magic = INODE_MAGIC;
+#ifdef EFILESYS
+		static char zeros[DISK_SECTOR_SIZE];
+
+		// last_clst가 가리키고 있는 empty list의 제일 첫번째 cluster에 EOChain을 넣고,
+		//  그 cluster return
+		cluster_t start = fat_create_chain(0);
+		disk_write(filesys_disk, cluster_to_sector(start), zeros);
+
+		disk_inode->start = cluster_to_sector(start);
+		disk_write (filesys_disk, sector, disk_inode);
+		cluster_t clst_length = sectors / SECTORS_PER_CLUSTER;
+
+		cluster_t original_start = start;
+
+		while (clst_length > 1) {
+			start = fat_create_chain(start);
+			if (start == 0) {	// 중간에 empty cluster 찾지 못한 경우
+				fat_remove_chain(original_start, 0);
+				free (disk_inode);
+				return success;
+			}
+			clst_length--;
+			disk_write(filesys_disk, cluster_to_sector(start), zeros);
+		}
+		free (disk_inode);
+		success = true;
+		return success;
+#endif
 		// free_map_allocate()를 FAT 기반으로 대체
 		// 필요한 길이만큼 fat_create_chain() 반복
 		if (free_map_allocate (sectors, &disk_inode->start)) {
@@ -177,12 +206,16 @@ inode_close (struct inode *inode) {
 
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
+#ifdef EFILESYS
+			fat_remove_chain(sector_to_cluster(inode->sector), 0);
+			fat_remove_chain(sector_to_cluster(inode->data.start), 0);
+#else
 			// HS. map 기반의 제거 -> FAT로 변경
 			free_map_release (inode->sector, 1);
 			free_map_release (inode->data.start,
 				bytes_to_sectors (inode->data.length)); 
+#endif
 		}
-
 		free (inode); 
 	}
 }
