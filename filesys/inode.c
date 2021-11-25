@@ -48,21 +48,25 @@ struct inode {
  * INODE.
  * Returns -1 if INODE does not contain data for a byte at offset
  * POS. */
+#ifdef EFILESYS
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
-	if (pos < inode->data.length) {
-		// HS. 수정
-		cluster_t tmp = inode->data.start;
-		while (pos > DISK_SECTOR_SIZE) {      
-			tmp = fat_get(tmp);
-			pos = pos - DISK_SECTOR_SIZE;
-		}
-		return cluster_to_sector(tmp);
-	} else
+	if (pos < inode->data.length)
+		return get_sector_using_fat(sector_to_cluster(inode->data.start), pos);
+	else
 		return -1;
 }
-
+#else
+static disk_sector_t
+byte_to_sector (const struct inode *inode, off_t pos) {
+	ASSERT (inode != NULL);
+	if (pos < inode->data.length)
+		return inode->data.start + pos / DISK_SECTOR_SIZE;
+	else
+		return -1;
+}
+#endif
 /* List of open inodes, so that opening a single inode twice
  * returns the same `struct inode'. */
 static struct list open_inodes;
@@ -122,7 +126,7 @@ inode_create (disk_sector_t sector, off_t length) {
 		free (disk_inode);
 		success = true;
 		return success;
-#endif
+#else
 		// free_map_allocate()를 FAT 기반으로 대체
 		// 필요한 길이만큼 fat_create_chain() 반복
 		if (free_map_allocate (sectors, &disk_inode->start)) {
@@ -138,9 +142,10 @@ inode_create (disk_sector_t sector, off_t length) {
 			}
 			success = true; 
 		} 
-		free (disk_inode);
+		free (disk_inode);	
+		return success;
+#endif
 	}
-	return success;
 }
 
 /* Reads an inode from SECTOR
