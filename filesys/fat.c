@@ -192,7 +192,6 @@ fat_fs_init (void) {
 cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
-   // lock_acquire(&fat_fs->write_lock);
    // last_clst가 FAT 영역을 벗어난 경우
    if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
       return 0;
@@ -287,9 +286,15 @@ sector_to_cluster (disk_sector_t sector) {
    return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER + 1;
 }
 
+/* 4-2-3 file의 길이는 1 sector로 제한되지 않는다. 따라서, 특정 file의
+		 offset을 찾고자 할 때 file-chain을 탐색해야할 수도 있다. 특정
+		 file의 시작 cluster와 file내에서 찾고 싶은 offset이 'pos'로 
+		 주어질 때, file-chain내에서 pos가 위치한 sector를 리턴한다.
+		 byte_to_sector에서 사용
+*/
 disk_sector_t
 get_sector_using_fat (cluster_t start, off_t pos){
-	off_t pos_left = pos %(DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+	off_t pos_left = pos % (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 	off_t cluster_cnt = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 	
 	for(int i = 0; i < cluster_cnt; i++){

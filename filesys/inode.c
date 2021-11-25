@@ -48,6 +48,10 @@ struct inode {
  * INODE.
  * Returns -1 if INODE does not contain data for a byte at offset
  * POS. */
+ /* 4-2-2 byte_to_sector에서 모든 file을 위한 sector는 연결되어 있는 것으로 가정하고 계산한다.
+		  FAT에서는 linked-list를 이용해 하나의 file을 위한 sector를 떨어트려 놓을 수 있음으로
+		  이를 적용한다.
+ */
 #ifdef EFILESYS
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
@@ -82,6 +86,7 @@ inode_init (void) {
  * disk.
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
+ /* 4-2-4 inode_create를 FAT style로 변경 */
 bool
 inode_create (disk_sector_t sector, off_t length) {
 	struct inode_disk *disk_inode = NULL;
@@ -105,12 +110,16 @@ inode_create (disk_sector_t sector, off_t length) {
 		// last_clst가 가리키고 있는 empty list의 제일 첫번째 cluster에 EOChain을 넣고,
 		//  그 cluster return
 		cluster_t start = fat_create_chain(0);
+		// start에 매칭되는 disk 상의 sector를 0으로 채움
 		disk_write(filesys_disk, cluster_to_sector(start), zeros);
 
 		disk_inode->start = cluster_to_sector(start);
 		disk_write (filesys_disk, sector, disk_inode);
 		cluster_t clst_length = sectors / SECTORS_PER_CLUSTER;
 
+		// file을 위한 cluster를 할당하는 중에 더이상 할당하지 못하게 된 경우,
+		// 지금까지 만들었던 chain이 없었던 처음으로 다시 돌려야함. 이를 위해
+		// chain의 처음을 기억하고 이후 fat_remove_chain(__, 0);을 사용.
 		cluster_t original_start = start;
 
 		while (clst_length > 1) {

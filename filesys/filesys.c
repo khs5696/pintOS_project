@@ -59,11 +59,14 @@ filesys_done (void) {
  * Returns true if successful, false otherwise.
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
+ // 4-2-0 create syscall에서 사용되던 filesys_create 수정
 bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
 	struct dir *dir = dir_open_root ();
 #ifdef EFILESYS
+// 새로운 file을 생성하기 위해 inode_disk가 만들어질 새로운 공간이 필요하므로,
+// fat_create_chain(0) 호출 -> cluster를 리턴하기 때문에 sector로 변환
 	bool success = (dir != NULL
 			&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
 			&& inode_create (inode_sector, initial_size)
@@ -112,7 +115,11 @@ filesys_remove (const char *name) {
 
 	return success;
 }
-// 4-0-4 할당해주고 생성을 위한 값들을 이전에 설정해줬음으로, 그 값들을 바탕으로 FAT 생성
+/* 4-0-4 할당해주고 생성을 위한 값들을 이전에 설정해줬음으로, 그 값들을 바탕으로 FAT 생성 */
+/* 4-2-1 free_map과 관련된 함수 모두 수정
+		 root directory의 위치는 더이상 disk 상에서 sector 1에 위치하지 않는다. cluster 상에
+		 서 1에 위치한 root directory의 위치를 sector로 변환하여 생성해야한다.
+*/
 /* Formats the file system. */
 static void
 do_format (void) {
