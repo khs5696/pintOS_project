@@ -229,13 +229,13 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
    
    cluster_t last_chain_clst = clst;
 
-   while (last_chain_clst != EOChain)
+   while (fat_get(last_chain_clst) != EOChain)
       last_chain_clst = fat_get(last_chain_clst);
    
-   lock_acquire (&fat_fs->write_lock);
+   // lock_acquire (&fat_fs->write_lock);
    fat_put(last_chain_clst, fat_fs->last_clst);
    fat_fs->last_clst = clst;
-   lock_release (&fat_fs->write_lock);
+   // lock_release (&fat_fs->write_lock);
 }   
 
 /* Update a value in the FAT table. */

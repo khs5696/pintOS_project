@@ -312,6 +312,32 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 	if (inode->deny_write_cnt)
 		return 0;
 
+	if (inode->data.length < size + offset) {
+		cluster_t current_length = bytes_to_sectors(inode->data.length) / SECTORS_PER_CLUSTER;
+		cluster_t total_length = bytes_to_sectors(size + offset) / SECTORS_PER_CLUSTER;
+		cluster_t need_length = total_length - current_length; 
+
+		if (inode->data.length == 0)
+			need_length--;
+
+
+		//printf("hello2\n");
+
+		cluster_t end_clst = inode->data.start;
+		while(current_length > 1) {
+		   end_clst = fat_get(end_clst); 
+		   current_length--;
+		}
+		// data.length가 0인 경우?
+		// cluster_t extend_clst = inode->data.length ? new_clst - old_clst : new_clst - old_clst - 1;
+
+		while (need_length > 0) {
+			end_clst = fat_create_chain(end_clst);
+			need_length--;
+		}
+	}
+	inode->data.length = size + offset;
+
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
 		disk_sector_t sector_idx = byte_to_sector (inode, offset);
