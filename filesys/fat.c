@@ -188,6 +188,32 @@ fat_fs_init (void) {
  * If CLST is 0, start a new chain.
  * Returns 0 if fails to allocate a new cluster. */
  // Warning : 일단 fat_put에 lock관련이 있어서 추가 안했는데, create 시작과 끝에 lock 필요할 수도
+// cluster_t
+// fat_create_chain (cluster_t clst) {
+//    /* TODO: Your code goes here. */
+//    // last_clst가 FAT 영역을 벗어난 경우
+//    if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
+//       return 0;
+//    // last_clst : 비어 있는 어떤 cluster를 가리킴.
+//    cluster_t empty = fat_fs->last_clst;
+//    cluster_t next_empty = fat_get(empty);
+//    ASSERT(next_empty != 0);
+
+//    static char zeros[DISK_SECTOR_SIZE];
+//    // 새로운 chain 시작
+//    if (clst == 0) {
+//       fat_put(empty, EOChain);
+//       fat_fs->last_clst = next_empty;
+//       disk_write(filesys_disk, cluster_to_sector(empty), zeros);
+//       return empty;
+//    }
+//    cluster_t next_file_cluster = fat_get(clst);
+//    fat_put(clst, empty);
+//    fat_put(empty, next_file_cluster);
+//    fat_fs->last_clst = next_empty;
+//    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
+//    return empty;
+// }
 cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
@@ -207,9 +233,10 @@ fat_create_chain (cluster_t clst) {
       disk_write(filesys_disk, cluster_to_sector(empty), zeros);
       return empty;
    }
-   cluster_t next_file_cluster = fat_get(clst);
+   // cluster_t next_file_cluster = fat_get(clst);
    fat_put(clst, empty);
-   fat_put(empty, next_file_cluster);
+   fat_put(empty, EOChain);
+   // fat_put(empty, next_file_cluster);
    fat_fs->last_clst = next_empty;
    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
    return empty;
