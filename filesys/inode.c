@@ -313,17 +313,18 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		return 0;
 
 	if (inode->data.length < size + offset) {
-		cluster_t current_length = bytes_to_sectors(inode->data.length) / SECTORS_PER_CLUSTER;
-		cluster_t total_length = bytes_to_sectors(size + offset) / SECTORS_PER_CLUSTER;
+		//cluster_t current_length = bytes_to_sectors(inode->data.length) / SECTORS_PER_CLUSTER;
+		//cluster_t total_length = bytes_to_sectors(size + offset) / SECTORS_PER_CLUSTER;
+		cluster_t current_length = DIV_ROUND_UP (inode->data.length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
+		cluster_t total_length = DIV_ROUND_UP (size + offset, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 		cluster_t need_length = total_length - current_length; 
 
 		if (inode->data.length == 0)
 			need_length--;
 
-
 		//printf("hello2\n");
 
-		cluster_t end_clst = inode->data.start;
+		cluster_t end_clst = sector_to_cluster(inode->data.start);
 		while(current_length > 1) {
 		   end_clst = fat_get(end_clst); 
 		   current_length--;
