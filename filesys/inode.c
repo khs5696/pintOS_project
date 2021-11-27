@@ -15,6 +15,7 @@
  * Must be exactly DISK_SECTOR_SIZE bytes long. */
 struct inode_disk {
 	// start : file에 대한 inode인 경우 파일의 실제 내용을, directory에 대한 inode인 경우 directory entry가 저장된 sector 번호를 나타냄.
+	/* 한양대 : file에 대한 inode인지, directory에 대한 inode인지 구분하는 property 필요 */
 	disk_sector_t start;                /* First data sector. */
 	// length : 저장된 공간의 길이(sector 단위)
 	off_t length;                       /* File size in bytes. */
@@ -87,6 +88,10 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
  /* 4-2-4 inode_create를 FAT style로 변경 */
+ /* 한양대 : dir_create(), filesys_create()에서 모두 inode_create()를 호출
+		   : inode_create에서 해당 inode가 directory 용도인지 file 용도인지
+		   : 를 확인하기 위해 parameter로 bool 값을 하나 더 받도록 수정
+ */
 bool
 inode_create (disk_sector_t sector, off_t length) {
 	struct inode_disk *disk_inode = NULL;
@@ -296,6 +301,7 @@ inode_read_at (struct inode *inode, void *buffer_, off_t size, off_t offset) {
  * less than SIZE if end of file is reached or an error occurs.
  * (Normally a write at end of file would extend the inode, but
  * growth is not yet implemented.) */
+ /* 4-3-0 file growth  */
 off_t
 inode_write_at (struct inode *inode, const void *buffer_, off_t size,
     	off_t offset) {

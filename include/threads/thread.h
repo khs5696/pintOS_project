@@ -138,6 +138,8 @@ struct thread {
 	struct thread * parent_thread;			// 현재 프로세스의 부모 스레드
 	struct intr_frame fork_intr;			// fork()를 위한 interrupt 변수
 
+	/* 한양대 : thread(=process)마다 현재 작업중인 directory를 기억하기 위해 struct dir 포함 필요 */
+
 	unsigned magic;                     /* Detects stack overflow. */
 };
 

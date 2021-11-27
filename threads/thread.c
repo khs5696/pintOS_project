@@ -130,6 +130,8 @@ thread_init (void) {
 	// HS 1-1-0. 잠자는 스레드들의 목록 초기화
 	list_init(&sleep_list);
 
+	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 NULL 대입 */
+
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -211,6 +213,11 @@ thread_create (const char *name, int priority,
 	init_thread (t, name, priority);
 	tid = t->tid = allocate_tid ();
 
+	/* 한양대 : thread를 새로 생성할 때, 현재 thread(=이제 부모 thread가 될 thread)
+			  : 의 작업 directory가 NULL이 아닐 경우, 자식도 똑같이 부모의 directory
+			  : 를 다시 오픈해서 설정
+	*/
+
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
 	t->tf.rip = (uintptr_t) kernel_thread;
@@ -248,7 +255,7 @@ thread_create (const char *name, int priority,
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
-   This function must be called with interrupts turned off.  It
+   This function must be called with interrupts turned off. It
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
 void

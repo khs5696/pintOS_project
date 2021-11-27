@@ -441,6 +441,8 @@ process_exit (void) {
 	sema_down(&curr->exit_child_sema);
 	sema_up(&curr->waiting_child_sema);
 
+	/* 한양대 : thread의 현재 작업중인 directory에 대해 저장하고 있던 정보를 해지 */
+
 	// HS 2-7-6. 스레드의 리소스 정리
 	process_cleanup ();
 }

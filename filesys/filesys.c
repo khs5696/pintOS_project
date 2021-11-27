@@ -32,6 +32,9 @@ filesys_init (bool format) {
 		do_format ();
 
 	fat_open ();
+	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 root directry로 설정 
+			  : dir_open_root()
+	*/
 #else
 	/* Original FS */
 	free_map_init ();
@@ -60,13 +63,23 @@ filesys_done (void) {
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
  // 4-2-0 create syscall에서 사용되던 filesys_create 수정
+ /* 4-4-2 파일 혹은 디렉토리 생성시 사용
+		  현재 dir는 무조건 root directory -> root direct
+		  ory만 생성하겠다는 뜻 -> 이걸 바꿔야함!
+*/
 bool
 filesys_create (const char *name, off_t initial_size) {
 	disk_sector_t inode_sector = 0;
+	/* 한양대 : 이 부분 변경 필요!
+			  : '.', '..' 기능의 file 구현
+			  : '/' 로 구분해서 절대, 상대 경로 기능 구현
+	*/
 	struct dir *dir = dir_open_root ();
 #ifdef EFILESYS
 // 새로운 file을 생성하기 위해 inode_disk가 만들어질 새로운 공간이 필요하므로,
 // fat_create_chain(0) 호출 -> cluster를 리턴하기 때문에 sector로 변환
+// inode_create에서 inode를 disk에 저장하고 initial_size가 포함되는 sector를 할당해 0으로 초기화
+
 	bool success = (dir != NULL
 			&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
 			&& inode_create (inode_sector, initial_size)
@@ -128,6 +141,7 @@ do_format (void) {
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
 	fat_create ();
+	// 4-4-1 root directory를 실제로 생성
 	if (!dir_create (cluster_to_sector(ROOT_DIR_CLUSTER), 16))
 		PANIC ("root directory creation failed");
 	fat_close ();

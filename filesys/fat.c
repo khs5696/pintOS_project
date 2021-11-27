@@ -134,9 +134,8 @@ fat_create (void) {
    if (fat_fs->fat == NULL)
       PANIC ("FAT creation failed");
 
-   // Set up ROOT_DIR_CLST
+   // 4-4-0 FAT에서 root directory를 위한 cluster 배정 = 1
    // ROOT_DIR_CLUSTER(=1) 위치의 FAT 값을 EOChain으로 변경
-   // root directory를 생성?
    fat_put (ROOT_DIR_CLUSTER, EOChain);
 
    for (int i = 3; i < fat_fs->fat_length; i++){
