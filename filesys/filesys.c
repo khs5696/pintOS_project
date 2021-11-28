@@ -8,6 +8,7 @@
 #include "filesys/directory.h"
 #include "filesys/fat.h"
 #include "devices/disk.h"
+#include "threads/thread.h"
 
 
 /* The disk that contains the file system. */
@@ -35,6 +36,8 @@ filesys_init (bool format) {
 	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 root directry로 설정 
 			  : dir_open_root()
 	*/
+	// 유섭인 do_format 안에 위치
+	thread_current()->work_dir = dir_open_root();
 #else
 	/* Original FS */
 	free_map_init ();
@@ -82,14 +85,14 @@ filesys_create (const char *name, off_t initial_size) {
 
 	bool success = (dir != NULL
 			&& (inode_sector = cluster_to_sector(fat_create_chain(0)))
-			&& inode_create (inode_sector, initial_size)
+			&& inode_create (inode_sector, initial_size, true)
 			&& dir_add (dir, name, inode_sector));
 	if (!success && inode_sector != 0)
 		fat_remove_chain(sector_to_cluster(inode_sector), 0);
 #else
 	bool success = (dir != NULL
 			&& free_map_allocate (1, &inode_sector)
-			&& inode_create (inode_sector, initial_size)
+			&& inode_create (inode_sector, initial_size, true)
 			&& dir_add (dir, name, inode_sector));
 	if (!success && inode_sector != 0)
 		free_map_release (inode_sector, 1);
@@ -142,7 +145,7 @@ do_format (void) {
 	/* Create FAT and save it to the disk. */
 	fat_create ();
 	// 4-4-1 root directory를 실제로 생성
-	if (!dir_create (cluster_to_sector(ROOT_DIR_CLUSTER), 16))
+	if (!dir_create (cluster_to_sector(ROOT_DIR_CLUSTER), 2))
 		PANIC ("root directory creation failed");
 	fat_close ();
 #else

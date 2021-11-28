@@ -131,7 +131,7 @@ thread_init (void) {
 	list_init(&sleep_list);
 
 	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 NULL 대입 */
-
+	inital_thread->work_dir = NULL;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.

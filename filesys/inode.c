@@ -19,8 +19,9 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	// length : 저장된 공간의 길이(sector 단위)
 	off_t length;                       /* File size in bytes. */
+	bool is_file;						//  수정
 	unsigned magic;                     /* Magic number. */
-	uint32_t unused[125];               /* Not used. */
+	uint32_t unused[124];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -93,7 +94,7 @@ inode_init (void) {
 		   : 를 확인하기 위해 parameter로 bool 값을 하나 더 받도록 수정
  */
 bool
-inode_create (disk_sector_t sector, off_t length) {
+inode_create (disk_sector_t sector, off_t length, bool is_file) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -108,6 +109,7 @@ inode_create (disk_sector_t sector, off_t length) {
 		// inode_disk 구조체 초기화 (start, length, magic)
 		size_t sectors = bytes_to_sectors (length);      // length (byte)를 섹터 단위(개수)로 변환
 		disk_inode->length = length;
+		disk_inode->is_file = is_file;					// 4-4-2
 		disk_inode->magic = INODE_MAGIC;
 #ifdef EFILESYS
 		static char zeros[DISK_SECTOR_SIZE];

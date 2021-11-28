@@ -9,6 +9,9 @@
 #ifdef VM
 #include "vm/vm.h"
 #endif
+#ifdef EFILESYS
+#include "filesys/directory.h"
+#endif
 
 
 /* States in a thread's life cycle. */
@@ -139,6 +142,10 @@ struct thread {
 	struct intr_frame fork_intr;			// fork()를 위한 interrupt 변수
 
 	/* 한양대 : thread(=process)마다 현재 작업중인 directory를 기억하기 위해 struct dir 포함 필요 */
+#ifdef EFILESYS
+	struct dir * work_dir;
+#endif
+	/* data */
 
 	unsigned magic;                     /* Detects stack overflow. */
 };
