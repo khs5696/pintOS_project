@@ -15,6 +15,8 @@
 #include "threads/malloc.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "filesys/inode.h"
+#include "filesys/directory.h"
 #include "userprog/process.h"
 #include "threads/palloc.h"
 
@@ -132,6 +134,26 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_MUNMAP:
 			// check_address(f->R.rdi);
 			munmap(f->R.rdi);
+			break;
+#endif
+#ifdef EFILESYS
+		case SYS_CHDIR:
+			check_address(f->R.rdi);
+			f->R.rax = chdir(f->R.rdi);
+			break;
+		case SYS_MKDIR:
+			check_address(f->R.rdi);
+			f->R.rax = mkdir(f->R.rdi);
+			break;
+		case SYS_READDIR:
+			check_address(f->R.rsi);
+			f->R.rax = readdir(f->R.rdi, f->R.rsi);
+			break;
+		case SYS_ISDIR:
+			f->R.rax = isdir(f->R.rdi);
+			break;
+		case SYS_INUMBER:
+			f->R.rax = inumber(f->R.rdi);
 			break;
 #endif
 		default:
@@ -444,6 +466,61 @@ munmap (void *addr) {
 
 }
 #endif
+#ifdef EFILESYS
+bool
+chdir (const char *dir) {
+	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
+	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
+	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
+
+	memcpy(full_path_name, dir, strlen(dir) + 1);
+
+	struct dir * target_dir = parse_path(full_path_name, act_file_name);
+
+	// parse_path에서 해당 경로가 존재하지 않음.
+	if (target_dir == NULL)
+		return false;
+
+	struct inode * lookup_inode;
+	dir_lookup(target_dir, act_file_name, &lookup_inode);
+	if (lookup_inode == NULL) {
+		return false;
+	}
+	if (!inode_is_dir(lookup_inode))
+		return false;
+
+	dir_close(thread_current()->work_dir);
+	dir_close(target_dir);	
+	thread_current()->work_dir = dir_open(lookup_inode);
+	return true;
+}
+
+bool
+mkdir (const char *dir) {
+	return filesys_create_dir(dir);
+}
+
+bool
+readdir (int fd, char* name) {
+	struct file* file = find_file_by_fd(fd);
+	if(!is_dir(file))
+		return false;
+	return dir_readdir((struct dir *) file, name);
+}
+
+bool
+isdir (int fd) {
+	struct file * file = find_file_by_fd(fd);
+	return is_dir(file);
+}
+
+int
+inumber (int fd) {
+	struct file * file = find_file_by_fd(fd);
+	return inode_get_inumber(file_get_inode(file));
+}
+#endif
+
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
 	int fd_a = list_entry(a, struct fd_elem, elem)->fd;
 	int fd_b = list_entry(b, struct fd_elem, elem)->fd;

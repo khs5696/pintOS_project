@@ -32,5 +32,10 @@ unsigned tell (int fd);
 void close(int arg_fd);
 void* mmap (void *addr, size_t length, int writable, int fd, off_t offset);
 void munmap (void *addr);
+bool chdir (const char *dir);
+bool mkdir (const char *dir);
+bool readdir (int fd, char* name);
+bool isdir (int fd);
+int inumber (int fd);
 
 #endif /* userprog/syscall.h */
