@@ -27,6 +27,6 @@ void file_allow_write (struct file *);
 void file_seek (struct file *, off_t);
 off_t file_tell (struct file *);
 off_t file_length (struct file *);
-bool is_dir (struct file *file);
+bool file_is_dir (struct file *file);
 
 #endif /* filesys/file.h */

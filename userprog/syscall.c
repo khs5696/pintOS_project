@@ -503,7 +503,7 @@ mkdir (const char *dir) {
 bool
 readdir (int fd, char* name) {
 	struct file* file = find_file_by_fd(fd);
-	if(!is_dir(file))
+	if(!file_is_dir(file))
 		return false;
 	return dir_readdir((struct dir *) file, name);
 }
@@ -511,7 +511,7 @@ readdir (int fd, char* name) {
 bool
 isdir (int fd) {
 	struct file * file = find_file_by_fd(fd);
-	return is_dir(file);
+	return file_is_dir(file);
 }
 
 int

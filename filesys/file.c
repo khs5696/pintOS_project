@@ -161,6 +161,6 @@ file_tell (struct file *file) {
 }
 
 bool
-is_dir (struct file *file) {
+file_is_dir (struct file *file) {
    return inode_is_dir(file->inode);
 }

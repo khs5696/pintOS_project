@@ -83,7 +83,7 @@ filesys_create (const char *name, off_t initial_size) {
 			  : 'name' 원본을 보존해주기 위해(왜 해줘야하는 지는 모르겠음) 'name'을 다른 변수에 복사!
 	*/
 	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
-	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
+	char * full_path_name = (char *) malloc(strlen(name) + 1);
 	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 
 	memcpy(full_path_name, name, strlen(name) + 1);
@@ -135,6 +135,9 @@ filesys_create (const char *name, off_t initial_size) {
 #ifdef EFILESYS
 struct file *
 filesys_open (const char *name) {
+	if(!strcmp(name, "/"))
+		return dir_open_root();
+	
 	struct inode *inode = NULL;
 
 	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
@@ -177,6 +180,9 @@ filesys_open (const char *name) {
 bool
 filesys_remove (const char *name) {
 	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
+	// 절대경로로 Root Directory를 지우려고 하는 경우
+	if(!strcmp(name, "/"))
+		return false;
 	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 
@@ -190,6 +196,12 @@ filesys_remove (const char *name) {
 		디렉터리내파일이존재하지않을경우, 디렉터리에서file_name의엔트리삭제
 		inode가파일일경우디렉터리엔트리에서file_name엔트리삭제
 	*/
+	// if (target_dir != NULL && sector_to_cluster(inode_get_inumber(dir_get_inode(target_dir))) == ROOT_DIR_CLUSTER) {
+	// 	dir_close (target_dir);
+	// 	free(full_path_name);
+	// 	free(act_file_name);
+	// 	return false;
+	// }
 	bool success = target_dir != NULL && dir_remove (target_dir, act_file_name);
 	dir_close (target_dir);
 
@@ -253,7 +265,6 @@ parse_path (char * path_name, char * file_name) {
 	if (strlen(path_name) == 0)
 		return NULL;
 	/* 'path_name'의 절대/상대 경로에 따른 디렉토리 정보 저장 */
-
 	if (path_name[0] == '/')
 		dir = dir_open_root();
 	else
@@ -289,7 +300,8 @@ parse_path (char * path_name, char * file_name) {
 	}
 	// 이상적인 상황은 token에 filename이고 nextToken이 NULL
 	/* token의 파일 이름을 file_name에 저장 */
-	memcpy(file_name, token, strlen(token) + 1);
+	int file_name_len = NAME_MAX > strlen(token) ? strlen(token) + 1 : NAME_MAX + 1;
+	memcpy(file_name, token, file_name_len);
 	/* dir 정보 반환 */
 	return dir;
 }

@@ -27,7 +27,7 @@ pass tests/userprog/create-normal
 pass tests/userprog/create-empty
 pass tests/userprog/create-null
 pass tests/userprog/create-bad-ptr
-FAIL tests/userprog/create-long
+pass tests/userprog/create-long
 pass tests/userprog/create-exists
 pass tests/userprog/create-bound
 pass tests/userprog/open-normal
@@ -99,7 +99,7 @@ FAIL tests/filesys/extended/dir-open
 pass tests/filesys/extended/dir-over-file
 FAIL tests/filesys/extended/dir-rm-cwd
 FAIL tests/filesys/extended/dir-rm-parent
-FAIL tests/filesys/extended/dir-rm-root
+pass tests/filesys/extended/dir-rm-root
 FAIL tests/filesys/extended/dir-rm-tree
 pass tests/filesys/extended/dir-rmdir
 pass tests/filesys/extended/dir-under-file
