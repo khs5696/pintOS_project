@@ -287,7 +287,7 @@ parse_path (char * path_name, char * file_name) {
 			return NULL;
 
 		// dir_lookup을 했는데 해당 경로가 존재하지 않는 경우
-		if(lookup_inode)
+		if(lookup_inode == NULL)
 			return NULL;
 		
 		/* dir의 디렉토리 정보를 메모리에서 해지 */
