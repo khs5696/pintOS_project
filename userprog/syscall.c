@@ -352,6 +352,9 @@ write (int fd, const void *buffer, unsigned size) {
 		return size;
 	} else if (fd >= 3) {
 		struct file * write_file = find_file_by_fd(fd);
+		if (file_is_dir(write_file) == true) {
+			return -1;
+		}
 		if (write_file != NULL) {
 			int actually_write_byte;
 
