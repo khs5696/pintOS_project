@@ -238,6 +238,11 @@ do_format (void) {
 	if (!dir_create (cluster_to_sector(ROOT_DIR_CLUSTER), 2))
 		PANIC ("root directory creation failed");
 	fat_close ();
+
+	struct dir* curr_dir = dir_open (inode_open (cluster_to_sector (ROOT_DIR_CLUSTER)));
+	dir_add (curr_dir, ".", inode_get_inumber(dir_get_inode(curr_dir)));
+	dir_add (curr_dir, "..", inode_get_inumber(dir_get_inode(curr_dir)));
+	dir_close(curr_dir);
 #else
 	free_map_create ();
 	if (!dir_create (ROOT_DIR_SECTOR, 16))
@@ -265,9 +270,10 @@ parse_path (char * path_name, char * file_name) {
 	if (strlen(path_name) == 0)
 		return NULL;
 	/* 'path_name'의 절대/상대 경로에 따른 디렉토리 정보 저장 */
-	if (path_name[0] == '/')
+	if (path_name[0] == '/') {
 		dir = dir_open_root();
-	else
+		path_name += 1;
+	} else
 		dir = dir_reopen(thread_current()->work_dir);
 
 	// parsing을 진행하며 경로따라 목표 directory로 이동

@@ -472,6 +472,12 @@ munmap (void *addr) {
 #ifdef EFILESYS
 bool
 chdir (const char *dir) {
+	if(!strcmp(dir, "/")) {
+		//dir_close(thread_current()->work_dir);
+		//thread_current()->work_dir = dir_open_root();
+		return true;
+	}
+
 	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
 	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
