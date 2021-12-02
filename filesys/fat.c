@@ -142,7 +142,8 @@ fat_create (void) {
       fat_put(i-1, i);
    }
 
-   fat_fs->last_clst = 2;
+   //fat_fs->last_clst = 2;
+   fat_put(0, 2);
 
    // Fill up ROOT_DIR_CLUSTER region with 0
    uint8_t *buf = calloc (1, DISK_SECTOR_SIZE);
@@ -174,9 +175,9 @@ void
 fat_fs_init (void) {
    /* TODO: Your code goes here. */
    // fat_length : file system 안에 현재 사용할 수 있는 cluster의 수
-   fat_fs->fat_length = (fat_fs->bs.total_sectors - 1 - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
+   fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
    // data_start : 처음으로 file을 저장하기 시작할 수 있는 sector의 index
-   fat_fs->data_start = fat_fs->bs.fat_sectors + fat_fs->bs.fat_start;
+   fat_fs->data_start = fat_fs->bs.fat_sectors + fat_fs->bs.fat_start + 2*SECTORS_PER_CLUSTER;
    lock_init(&fat_fs->write_lock);
 }
 
@@ -218,26 +219,29 @@ cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
    // last_clst가 FAT 영역을 벗어난 경우
-   if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
-      return 0;
+   //if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
+   //   return 0;
    // last_clst : 비어 있는 어떤 cluster를 가리킴.
-   cluster_t empty = fat_fs->last_clst;
-   cluster_t next_empty = fat_get(empty);
-   ASSERT(next_empty != 0);
+   //cluster_t empty = fat_fs->last_clst;
+   
+	cluster_t empty = fat_get(0);
+	fat_put(0, fat_get(empty));
+   //cluster_t next_empty = fat_get(empty);
+   //ASSERT(next_empty != 0);
 
    static char zeros[DISK_SECTOR_SIZE];
    // 새로운 chain 시작
    if (clst == 0) {
       fat_put(empty, EOChain);
-      fat_fs->last_clst = next_empty;
+      //fat_fs->last_clst = next_empty;
       disk_write(filesys_disk, cluster_to_sector(empty), zeros);
       return empty;
    }
    // cluster_t next_file_cluster = fat_get(clst);
-   fat_put(clst, empty);
    fat_put(empty, EOChain);
+   fat_put(clst, empty);
    // fat_put(empty, next_file_cluster);
-   fat_fs->last_clst = next_empty;
+   //fat_fs->last_clst = next_empty;
    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
    return empty;
 }
@@ -260,8 +264,11 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
       last_chain_clst = fat_get(last_chain_clst);
    
    // lock_acquire (&fat_fs->write_lock);
-   fat_put(last_chain_clst, fat_fs->last_clst);
-   fat_fs->last_clst = clst;
+   //fat_put(last_chain_clst, fat_fs->last_clst);
+   //fat_fs->last_clst = clst;
+   
+	fat_put(last_chain_clst, fat_get(0));
+	fat_put(0, clst);
    // lock_release (&fat_fs->write_lock);
 }   
 
@@ -274,7 +281,7 @@ void
 fat_put (cluster_t clst, cluster_t val) {
    /* TODO: Your code goes here. */
    // clst 0은 Boot Sector용이라서 안 되고, clst가 FAT보다 큰 값이 들어오면 접근 불가!
-   if (clst == 0 || clst >= fat_fs->fat_length)
+   if (clst >= fat_fs->fat_length)
       return;
    lock_acquire (&fat_fs->write_lock);
    fat_fs->fat[clst] = val;
@@ -287,7 +294,7 @@ fat_put (cluster_t clst, cluster_t val) {
 cluster_t
 fat_get (cluster_t clst) {
    /* TODO: Your code goes here. */
-   if (clst == 0 || clst >= fat_fs->fat_length)
+   if (clst >= fat_fs->fat_length)
       return 0;
    return fat_fs->fat[clst];
 }
@@ -304,12 +311,12 @@ cluster_to_sector (cluster_t clst) {
    // clst가 0이면 잘못된 clst (disk_sector_t는 uint임으로 음수를 가질 수 없음)
    if (clst == 0)
       return 0;
-   return fat_fs->data_start + (clst - 1) * SECTORS_PER_CLUSTER;
+   return fat_fs->data_start + (clst - 2) * SECTORS_PER_CLUSTER;
 }
 
 cluster_t
 sector_to_cluster (disk_sector_t sector) {
-   return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER + 1;
+   return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER + 2;
 }
 
 /* 4-2-3 file의 길이는 1 sector로 제한되지 않는다. 따라서, 특정 file의
