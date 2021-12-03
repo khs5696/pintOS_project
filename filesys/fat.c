@@ -138,13 +138,6 @@ fat_create (void) {
    // ROOT_DIR_CLUSTER(=1) 위치의 FAT 값을 EOChain으로 변경
    fat_put (ROOT_DIR_CLUSTER, EOChain);
 
-   for (int i = 3; i < fat_fs->fat_length; i++){
-      fat_put(i-1, i);
-   }
-
-   //fat_fs->last_clst = 2;
-   fat_put(0, 2);
-
    // Fill up ROOT_DIR_CLUSTER region with 0
    uint8_t *buf = calloc (1, DISK_SECTOR_SIZE);
    if (buf == NULL)
@@ -215,6 +208,18 @@ fat_fs_init (void) {
 //    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
 //    return empty;
 // }
+static cluster_t find_empty_cluster() {
+//    lock_acquire(&fat_fs->write_lock);
+   // ASSERT(lock_held_by_current_thread(&fat_fs->write_lock));
+    for (cluster_t i = 1; i < fat_fs->fat_length; i++) {
+        if (fat_get(i) == 0)
+            return i;
+    }
+    return 0;
+//    lock_release(&fat_fs->write_lock);
+}
+
+
 cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
@@ -224,8 +229,7 @@ fat_create_chain (cluster_t clst) {
    // last_clst : 비어 있는 어떤 cluster를 가리킴.
    //cluster_t empty = fat_fs->last_clst;
    
-	cluster_t empty = fat_get(0);
-	fat_put(0, fat_get(empty));
+	cluster_t empty = find_empty_cluster();
    //cluster_t next_empty = fat_get(empty);
    //ASSERT(next_empty != 0);
 
@@ -258,17 +262,12 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
    if (pclst != 0)
       fat_put(pclst, EOChain);
    
-   cluster_t last_chain_clst = clst;
-
-   while (fat_get(last_chain_clst) != EOChain)
-      last_chain_clst = fat_get(last_chain_clst);
-   
-   // lock_acquire (&fat_fs->write_lock);
-   //fat_put(last_chain_clst, fat_fs->last_clst);
-   //fat_fs->last_clst = clst;
-   
-	fat_put(last_chain_clst, fat_get(0));
-	fat_put(0, clst);
+    cluster_t curr = clst;
+    while (curr != EOChain) {
+        cluster_t next = fat_get(curr);
+        fat_put(curr, 0);
+        curr = next;
+    }
    // lock_release (&fat_fs->write_lock);
 }   
 
