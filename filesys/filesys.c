@@ -152,6 +152,9 @@ filesys_open (const char *name) {
 		dir_lookup (target_dir, act_file_name, &inode);
 	dir_close (target_dir);
 
+	if (inode == NULL)
+		return NULL;
+
 	free(full_path_name);
 	free(act_file_name);
 
@@ -196,12 +199,6 @@ filesys_remove (const char *name) {
 		디렉터리내파일이존재하지않을경우, 디렉터리에서file_name의엔트리삭제
 		inode가파일일경우디렉터리엔트리에서file_name엔트리삭제
 	*/
-	// if (target_dir != NULL && sector_to_cluster(inode_get_inumber(dir_get_inode(target_dir))) == ROOT_DIR_CLUSTER) {
-	// 	dir_close (target_dir);
-	// 	free(full_path_name);
-	// 	free(act_file_name);
-	// 	return false;
-	// }
 	bool success = target_dir != NULL && dir_remove (target_dir, act_file_name);
 	dir_close (target_dir);
 
@@ -288,14 +285,15 @@ parse_path (char * path_name, char * file_name) {
 	while (token != NULL && nextToken != NULL) {
 		/* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장 */
 		dir_lookup (dir, token, &lookup_inode);
-		/* inode가 파일일 경우 NULL 반환 */
-		if (!inode_is_dir(lookup_inode))
-			return NULL;
 
 		// dir_lookup을 했는데 해당 경로가 존재하지 않는 경우
 		if(lookup_inode == NULL)
 			return NULL;
 		
+		/* inode가 파일일 경우 NULL 반환 */
+		if (!inode_is_dir(lookup_inode))
+			return NULL;
+
 		/* dir의 디렉토리 정보를 메모리에서 해지 */
 		dir_close(dir);
 		/* inode의 디렉토리 정보를 dir에 저장 */

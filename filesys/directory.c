@@ -91,7 +91,6 @@ lookup (const struct dir *dir, const char *name,
 
 	ASSERT (dir != NULL);
 	ASSERT (name != NULL);
-
 	for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
 			ofs += sizeof e)
 		if (e.in_use && !strcmp (name, e.name)) {
@@ -185,13 +184,12 @@ dir_remove (struct dir *dir, const char *name) {
 	/* Find directory entry. */
 	if (!lookup (dir, name, &e, &ofs))
 		goto done;
-
 	/* Open inode. */
 	inode = inode_open (e.inode_sector);
 	if (inode == NULL)
 		goto done;
 
-	if (inode_is_dir (inode)){
+	if (inode_is_dir (inode)) {
 		char tmp[NAME_MAX + 1];
 		struct dir* remove_dir = dir_open(inode);
 		if (dir_readdir (remove_dir, tmp))
@@ -232,4 +230,16 @@ dir_readdir (struct dir *dir, char name[NAME_MAX + 1]) {
 		}
 	}
 	return false;
+}
+
+void
+print_dir_entry (struct dir* dir) {
+	struct dir_entry e;
+	size_t ofs;
+
+	printf("subdirectory list: \n");
+	for (ofs = 0; inode_read_at (dir->inode, &e, sizeof e, ofs) == sizeof e;
+			ofs += sizeof e)
+		printf("%s\n", e.name);
+	return;
 }

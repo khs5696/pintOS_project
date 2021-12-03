@@ -230,8 +230,8 @@ inode_close (struct inode *inode) {
 		/* Deallocate blocks if removed. */
 		if (inode->removed) {
 #ifdef EFILESYS
-			fat_remove_chain(sector_to_cluster(inode->sector), 0);
 			fat_remove_chain(sector_to_cluster(inode->data.start), 0);
+			fat_remove_chain(sector_to_cluster(inode->sector), 0);
 #else
 			// HS. map 기반의 제거 -> FAT로 변경
 			free_map_release (inode->sector, 1);
@@ -317,8 +317,6 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		return 0;
 
 	if (inode->data.length < size + offset) {
-		//cluster_t current_length = bytes_to_sectors(inode->data.length) / SECTORS_PER_CLUSTER;
-		//cluster_t total_length = bytes_to_sectors(size + offset) / SECTORS_PER_CLUSTER;
 		cluster_t current_length = DIV_ROUND_UP (inode->data.length, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 		cluster_t total_length = DIV_ROUND_UP (size + offset, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 		cluster_t need_length = total_length - current_length;
@@ -344,8 +342,8 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 			end_clst = fat_create_chain(end_clst);
 			need_length--;
 		}
+		inode->data.length = size + offset;
 	}
-	inode->data.length = size + offset;
 
 	while (size > 0) {
 		/* Sector to write, starting byte offset within sector. */
