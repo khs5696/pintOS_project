@@ -477,36 +477,9 @@ munmap (void *addr) {
 #ifdef EFILESYS
 bool
 chdir (const char *dir) {
-	if(!strcmp(dir, "/")) {
-		//dir_close(thread_current()->work_dir);
-		//thread_current()->work_dir = dir_open_root();
-		return true;
-	}
-
-	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
-	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
-	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
-
-	memcpy(full_path_name, dir, strlen(dir) + 1);
-
-	struct dir * target_dir = parse_path(full_path_name, act_file_name);
-
-	// parse_path에서 해당 경로가 존재하지 않음.
-	if (target_dir == NULL)
+	if (strlen(dir) == 0)
 		return false;
-
-	struct inode * lookup_inode;
-	dir_lookup(target_dir, act_file_name, &lookup_inode);
-	if (lookup_inode == NULL) {
-		return false;
-	}
-	if (!inode_is_dir(lookup_inode))
-		return false;
-
-	dir_close(thread_current()->work_dir);
-	dir_close(target_dir);	
-	thread_current()->work_dir = dir_open(lookup_inode);
-	return true;
+	return dir_change(dir);
 }
 
 bool
@@ -524,13 +497,13 @@ readdir (int fd, char* name) {
 
 bool
 isdir (int fd) {
-	struct file * file = find_file_by_fd(fd);
+	struct file* file = find_file_by_fd(fd);
 	return file_is_dir(file);
 }
 
 int
 inumber (int fd) {
-	struct file * file = find_file_by_fd(fd);
+	struct file* file = find_file_by_fd(fd);
 	return inode_get_inumber(file_get_inode(file));
 }
 

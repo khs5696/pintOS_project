@@ -273,6 +273,47 @@ dir_readdir (struct dir * dir, char name[NAME_MAX + 1]) {
 	return false;
 }
 
+bool
+dir_change (const char* dir) {
+	bool result = false;
+	// Root Directory로 이동하고자 하는 경우
+	if(!strcmp(dir, "/")) {
+		dir_close(thread_current()->work_dir);
+		thread_current()->work_dir = dir_open_root();
+		return true;
+	}
+
+	// /* name 경로 분석 */
+	char * file_name = (char *) malloc(NAME_MAX+1);
+	struct dir * target_dir = search_target_dir(dir, file_name);
+	
+	// filesystem에서 target_dir을 찾아봤는데 없는 경우
+	if(target_dir == NULL)
+		goto clean;
+
+	struct inode * lookup_inode;
+	dir_lookup(target_dir, file_name, &lookup_inode);
+	/* target_dir에서 최종적으로 이동하길 희망하는 directory가 없거나,
+	 * directory가 아닌 file의 이름일 경우 */
+	if (lookup_inode == NULL || !inode_is_dir(lookup_inode))
+		goto close_inode;
+
+	// 여기에도 soft link 고려해야하는 거 아님????
+
+	// 현재 작업중인 directory(work_dir) 변경
+	dir_close(thread_current()->work_dir);
+	thread_current()->work_dir = dir_open(lookup_inode);
+	result = true;
+	goto clean;
+
+close_inode:
+	inode_close(lookup_inode);
+clean:
+	dir_close(target_dir);
+	free(file_name);
+	return result;
+}
+
 void
 print_dir_entry (struct dir * dir) {
 	struct dir_entry e;
