@@ -23,5 +23,6 @@ bool inode_is_dir (const struct inode* inode);
 bool inode_is_link (const struct inode* inode);
 bool inode_set_soft_link(disk_sector_t inode_sector, const char* target);
 char * inode_change_to_soft_link_path (const struct inode* inode);
+int inode_open_cnt (const struct inode *inode);
 
 #endif /* filesys/inode.h */

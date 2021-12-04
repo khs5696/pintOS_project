@@ -51,17 +51,28 @@ struct inode {
  * INODE.
  * Returns -1 if INODE does not contain data for a byte at offset
  * POS. */
- /* 4-2-2 byte_to_sector에서 모든 file을 위한 sector는 연결되어 있는 것으로 가정하고 계산한다.
-		  FAT에서는 linked-list를 이용해 하나의 file을 위한 sector를 떨어트려 놓을 수 있음으로
-		  이를 적용한다.
+ /* 4-2-2 file의 길이는 1 sector로 제한되지 않는다. byte_to_sector에서 
+ 		  모든 file을 위한 sector는 연결되어 있는 것으로 가정하고 계산한다.
+		  FAT에서는 linked-list를 이용해 하나의 file을 위한 sector를 
+		  떨어트려 놓을 수 있음으로이를 적용한다.
  */
 #ifdef EFILESYS
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
-	if (pos < inode->data.length)
-		return get_sector_using_fat(sector_to_cluster(inode->data.start), pos);
-	else
+	if (pos < inode->data.length) {
+		off_t cluster_num = pos / (DISK_SECTOR_SIZE*SECTORS_PER_CLUSTER);
+		off_t left_byte = pos % (DISK_SECTOR_SIZE*SECTORS_PER_CLUSTER);
+		// pos가 가리키는 위치의 sector로 이동
+		cluster_t loop_cluster = sector_to_cluster(inode->data.start);
+		for (int i = 0; i < cluster_num; i++) {
+			loop_cluster = fat_get(loop_cluster);
+			if (loop_cluster == EOChain)
+				PANIC("Wrong EOChain in the middle of file");
+		}
+		disk_sector_t pos_sector = cluster_to_sector(loop_cluster);
+		return pos_sector;
+	} else
 		return -1;
 }
 #else
@@ -448,4 +459,9 @@ clean:
 char *
 inode_change_to_soft_link_path (const struct inode* inode) {
 	return inode->data.soft_link_path;
+}
+
+int
+inode_open_cnt (const struct inode *inode) {
+      return inode->open_cnt;
 }

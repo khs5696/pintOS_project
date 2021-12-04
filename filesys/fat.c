@@ -168,9 +168,9 @@ void
 fat_fs_init (void) {
    /* TODO: Your code goes here. */
    // fat_length : file system 안에 현재 사용할 수 있는 cluster의 수
-   fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
+   fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
    // data_start : 처음으로 file을 저장하기 시작할 수 있는 sector의 index
-   fat_fs->data_start = fat_fs->bs.fat_sectors + fat_fs->bs.fat_start + 2*SECTORS_PER_CLUSTER;
+   fat_fs->data_start = fat_fs->bs.fat_sectors + fat_fs->bs.fat_start + 1;
    lock_init(&fat_fs->write_lock);
 }
 
@@ -178,86 +178,46 @@ fat_fs_init (void) {
 /* FAT handling                                                               */
 /*----------------------------------------------------------------------------*/
 
+/* FAT를 처음부터 순회하면서 비어있는 가장 첫 번째 cluster를 return
+ * 만약 모든 FAT가 다 차서 더 이상 할당할 수 없으면 0을 리턴 */
+static cluster_t 
+find_empty_cluster (void) {
+   for (cluster_t i = 2; i < fat_fs->fat_length; i++) {
+      if (fat_get(i) == 0)
+         return i;
+   }
+   return 0;
+}
+
 /* Add a cluster to the chain.
  * If CLST is 0, start a new chain.
  * Returns 0 if fails to allocate a new cluster. */
- // Warning : 일단 fat_put에 lock관련이 있어서 추가 안했는데, create 시작과 끝에 lock 필요할 수도
-// cluster_t
-// fat_create_chain (cluster_t clst) {
-//    /* TODO: Your code goes here. */
-//    // last_clst가 FAT 영역을 벗어난 경우
-//    if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
-//       return 0;
-//    // last_clst : 비어 있는 어떤 cluster를 가리킴.
-//    cluster_t empty = fat_fs->last_clst;
-//    cluster_t next_empty = fat_get(empty);
-//    ASSERT(next_empty != 0);
-
-//    static char zeros[DISK_SECTOR_SIZE];
-//    // 새로운 chain 시작
-//    if (clst == 0) {
-//       fat_put(empty, EOChain);
-//       fat_fs->last_clst = next_empty;
-//       disk_write(filesys_disk, cluster_to_sector(empty), zeros);
-//       return empty;
-//    }
-//    cluster_t next_file_cluster = fat_get(clst);
-//    fat_put(clst, empty);
-//    fat_put(empty, next_file_cluster);
-//    fat_fs->last_clst = next_empty;
-//    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
-//    return empty;
-// }
-static cluster_t find_empty_cluster() {
-//    lock_acquire(&fat_fs->write_lock);
-   // ASSERT(lock_held_by_current_thread(&fat_fs->write_lock));
-    for (cluster_t i = 1; i < fat_fs->fat_length; i++) {
-        if (fat_get(i) == 0)
-            return i;
-    }
-    return 0;
-//    lock_release(&fat_fs->write_lock);
-}
-
-
 cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
-   // last_clst가 FAT 영역을 벗어난 경우
-   //if(fat_fs->last_clst == 0 || fat_fs->last_clst >= fat_fs->fat_length)
-   //   return 0;
-   // last_clst : 비어 있는 어떤 cluster를 가리킴.
-   //cluster_t empty = fat_fs->last_clst;
-   
 	cluster_t empty = find_empty_cluster();
-   //cluster_t next_empty = fat_get(empty);
-   //ASSERT(next_empty != 0);
-
+   // if (empty == 0)
+   //    PANIC("error");
    static char zeros[DISK_SECTOR_SIZE];
-   // 새로운 chain 시작
-   if (clst == 0) {
+   
+   if (clst == 0) {  // 새로운 chain 시작
       fat_put(empty, EOChain);
-      //fat_fs->last_clst = next_empty;
-      disk_write(filesys_disk, cluster_to_sector(empty), zeros);
-      return empty;
+   } else { // 기존은 chain에 추가
+      fat_put(empty, EOChain);
+      fat_put(clst, empty);
    }
-   // cluster_t next_file_cluster = fat_get(clst);
-   fat_put(empty, EOChain);
-   fat_put(clst, empty);
-   // fat_put(empty, next_file_cluster);
-   //fat_fs->last_clst = next_empty;
+   // FAT에 추가한 cluster를 바탕으로 disk상에서 공간 할당
    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
    return empty;
 }
 
 /* Remove the chain of clusters starting from CLST.
  * If PCLST is 0, assume CLST as the start of the chain. */
-// pclst는 chain에서 바로 직전의 cluster
-// 이 함수가 실행되고 나면, pclst는 업데이트된 chain의 가장 마지막 element가 되어야한다.
-// 'clst'가 chain의 첫번째 element인 경우, pclst는 0이어야 한다.
+/* 이 함수가 실행되고 나면, PCLST는 업데이트된 chain의 마지막 element가 됨. */
 void
 fat_remove_chain (cluster_t clst, cluster_t pclst) {
    /* TODO: Your code goes here. */
+   // CLST가 chain의 가장 처음이라 PCLST가 0이 되던지, CLST의 바로 앞이 PCLST여야 함.
    ASSERT (pclst == 0 || fat_get(pclst) == clst);
    if (pclst != 0)
       fat_put(pclst, EOChain);
@@ -268,14 +228,10 @@ fat_remove_chain (cluster_t clst, cluster_t pclst) {
         fat_put(curr, 0);
         curr = next;
     }
-   // lock_release (&fat_fs->write_lock);
 }   
 
 /* Update a value in the FAT table. */
-// cluster number 'clst'로 표시된 FAT entry를 val로 업데이트한다. 
-// FAT의 각 entry는 chain에서 그 다음 cluster를 가리키고 있기 때문에 (존재하는 경우; 아니라면 EOChain), 
-// 이것은 연결성을 update하는 데 사용될 수 있다.
-// fat_create에서 사용
+/* CLST에 해당하는 FAT entry를 VAL로 업데이트한다. */
 void
 fat_put (cluster_t clst, cluster_t val) {
    /* TODO: Your code goes here. */
@@ -316,26 +272,4 @@ cluster_to_sector (cluster_t clst) {
 cluster_t
 sector_to_cluster (disk_sector_t sector) {
    return (sector - fat_fs->data_start) / SECTORS_PER_CLUSTER + 2;
-}
-
-/* 4-2-3 file의 길이는 1 sector로 제한되지 않는다. 따라서, 특정 file의
-		 offset을 찾고자 할 때 file-chain을 탐색해야할 수도 있다. 특정
-		 file의 시작 cluster와 file내에서 찾고 싶은 offset이 'pos'로 
-		 주어질 때, file-chain내에서 pos가 위치한 sector를 리턴한다.
-		 byte_to_sector에서 사용
-*/
-disk_sector_t
-get_sector_using_fat (cluster_t start, off_t pos){
-	off_t pos_left = pos % (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
-	off_t cluster_cnt = pos / (DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
-	
-	for(int i = 0; i < cluster_cnt; i++){
-		start = fat_get(start);
-		if(start == EOChain){
-			PANIC("Can't go further");
-		}
-	}
-	disk_sector_t sector = cluster_to_sector(start);
-	sector += pos_left / DISK_SECTOR_SIZE;
-	return sector;
 }

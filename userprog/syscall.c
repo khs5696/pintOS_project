@@ -562,5 +562,4 @@ find_file_by_fd (int fd) {
 		}
 	}
 	return NULL;
-
 }
