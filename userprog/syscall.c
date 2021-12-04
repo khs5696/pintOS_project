@@ -155,6 +155,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_INUMBER:
 			f->R.rax = inumber(f->R.rdi);
 			break;
+		// case SYS_SYMLINK:
+		// 	check_address(f->R.rdi);
+		// 	check_address(f->R.rsi);
+		// 	f->R.rax = symlink(f->R.rdi, f->R.rsi);
+		// 	break;
 #endif
 		default:
 			thread_exit();
@@ -262,7 +267,7 @@ remove (const char * file) {
 }
 
 int
-open(const char * file) {
+open (const char * file) {
 	if (file == NULL) { return -1; }	// file name error
 	
 	// filesys_open()으로 파일을 여는 동안, synchronization을 통해 추가적인 접근을 제한한다.
@@ -528,6 +533,12 @@ inumber (int fd) {
 	struct file * file = find_file_by_fd(fd);
 	return inode_get_inumber(file_get_inode(file));
 }
+
+
+// int
+// symlink (const char* target, const char* linkpath) {
+// 	return filesys_make_soft_link(target, linkpath);
+// }
 #endif
 
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
