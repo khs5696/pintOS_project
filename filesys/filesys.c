@@ -139,7 +139,6 @@ filesys_open (const char *name) {
 	
 	struct inode *inode = NULL;
 
-	// act_file_name은 몰라도 full_path_name은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
 	char * full_path_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 	char * act_file_name = (char *) malloc(sizeof(char)*(NAME_MAX+1));
 
@@ -153,7 +152,9 @@ filesys_open (const char *name) {
 
 	if (inode == NULL)
 		return NULL;
-
+	else if (inode_is_link(inode))
+		return filesys_open(inode_change_to_soft_link_path(inode));
+	
 	free(full_path_name);
 	free(act_file_name);
 
@@ -294,17 +295,52 @@ parse_path (char * path_name, char * file_name) {
 
 		// dir_lookup을 했는데 해당 경로가 존재하지 않거나,
 		// 찾았지만 directory가 아닌 file인 경우
-		if(lookup_inode == NULL || !inode_is_dir(lookup_inode)) {
+		// + directory는 아니지만 soft link 일 수 있음으로 inode_is_dir 빼줌
+		if(lookup_inode == NULL) {
 			// path search를 위해 open해뒀던 임시 directory close
 			dir_close(dir);
 			// lookup_inode == NULL이어도 지장 없음
 			inode_close(lookup_inode);
-			dir = NULL;
-			goto clean;
+			return NULL;
 		}
 
 		/* dir의 디렉토리 정보를 메모리에서 해지 */
 		dir_close(dir);
+
+		/* 찾은 inode가 soft link인 경우 */
+		if (inode_is_link(lookup_inode)) {
+			char * act_file_name = (char *) malloc(NAME_MAX+1);
+			char* soft_link_path = inode_change_to_soft_link_path(lookup_inode);
+
+			struct dir * target_dir = search_target_dir(soft_link_path, act_file_name);
+			if (target_dir == NULL) {
+				free(act_file_name);
+				PANIC("soft_link_path로 찾았는데 없대 -> soft_link_path 이상");
+			}
+			// target_dir 찾았으니까 lookup_inode close
+			inode_close(lookup_inode);
+			// target_dir에서 act_file_name에 해당하는 file의 inode 불러오기
+			dir_lookup(target_dir, act_file_name, &lookup_inode);
+
+			// dir_lookup을 했는데 해당 경로가 존재하지 않을 경우
+			if (lookup_inode == NULL) {
+				// path search를 위해 open해뒀던 임시 directory close
+				dir_close(target_dir);
+				// lookup_inode == NULL이어도 지장 없음
+				inode_close(lookup_inode);
+				return NULL;
+			}
+		}
+		// 위의 inode_is_link와 순서 바뀌면 안됨!!!!!
+		// 먼저 file 중에서 soft link file인지 확인하고 그 나머지 경우 error
+		if (!inode_is_dir(lookup_inode)){
+			// path search를 위해 open해뒀던 임시 directory close
+			dir_close(dir);
+			// lookup_inode == NULL이어도 지장 없음
+			inode_close(lookup_inode);
+			return NULL;
+		}
+
 		/* inode의 디렉토리 정보를 dir에 저장 */
 		dir = dir_open(lookup_inode);
 		/* token에 검색할 경로 이름 저장 */
@@ -383,10 +419,39 @@ clean:
 	return success;
 }
 
-// int
-// filesys_make_soft_link(const char* target, const char* linkpath) {
-// 	// error case
-// 	if (target == NULL || linkpath == NULL || strlen(target) == 0 || strlen(linkpath) == 0)
-// 		return -1;
+int
+filesys_make_soft_link(const char* target, const char* linkpath) {
+	int result = -1;
+	// input error case
+	if (target == NULL || linkpath == NULL || strlen(target) == 0 || strlen(linkpath) == 0)
+		return result;
+
+	/* name 경로 분석 */
+	char * file_name = (char *) malloc(NAME_MAX+1);
+	struct dir * target_dir = search_target_dir(linkpath, file_name);
 	
-// }
+	// filesystem에서 target_dir을 찾아봤는데 없는 경우
+	if(target_dir == NULL)
+		goto clean;
+	
+	disk_sector_t inode_sector;
+	bool success = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
+				// 할당받은 inode_sector에 file용 inode 저장
+				&& inode_create (inode_sector, 0, false)
+				/* 디렉토리 엔트리에 file_name의 엔트리 추가 */
+				&& dir_add (target_dir, file_name, inode_sector));
+	// 실제 inode를 생성해서 directory에 저장하는 것은 실패했지만, fat상으로는 disk 공간을 할당한 경우
+	if (!success && inode_sector != 0) {
+		fat_remove_chain(sector_to_cluster(inode_sector), 0);
+		goto clean;
+	}
+	// soft link 연결까지 성공
+	if(inode_set_soft_link(inode_sector, target))
+		result = 0;
+
+clean:
+	free(file_name);
+	// target_dir == NULL이어도 지장 없음
+	dir_close(target_dir);
+	return result;
+}

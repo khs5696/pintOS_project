@@ -37,5 +37,5 @@ bool mkdir (const char *dir);
 bool readdir (int fd, char* name);
 bool isdir (int fd);
 int inumber (int fd);
-// int symlink (const char* target, const char* linkpath);
+int symlink (const char* target, const char* linkpath);
 #endif /* userprog/syscall.h */

@@ -20,5 +20,8 @@ void inode_deny_write (struct inode *);
 void inode_allow_write (struct inode *);
 off_t inode_length (const struct inode *);
 bool inode_is_dir (const struct inode* inode);
+bool inode_is_link (const struct inode* inode);
+bool inode_set_soft_link(disk_sector_t inode_sector, const char* target);
+char * inode_change_to_soft_link_path (const struct inode* inode);
 
 #endif /* filesys/inode.h */

@@ -155,11 +155,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_INUMBER:
 			f->R.rax = inumber(f->R.rdi);
 			break;
-		// case SYS_SYMLINK:
-		// 	check_address(f->R.rdi);
-		// 	check_address(f->R.rsi);
-		// 	f->R.rax = symlink(f->R.rdi, f->R.rsi);
-		// 	break;
+		case SYS_SYMLINK:
+			check_address(f->R.rdi);
+			check_address(f->R.rsi);
+			f->R.rax = symlink(f->R.rdi, f->R.rsi);
+			break;
 #endif
 		default:
 			thread_exit();
@@ -535,10 +535,10 @@ inumber (int fd) {
 }
 
 
-// int
-// symlink (const char* target, const char* linkpath) {
-// 	return filesys_make_soft_link(target, linkpath);
-// }
+int
+symlink (const char* target, const char* linkpath) {
+	return filesys_make_soft_link(target, linkpath);
+}
 #endif
 
 static bool compare_by_fd(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {

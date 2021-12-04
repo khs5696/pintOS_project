@@ -19,9 +19,10 @@ struct inode_disk {
 	disk_sector_t start;                /* First data sector. */
 	// length : 저장된 공간의 길이(sector 단위)
 	off_t length;                       /* File size in bytes. */
-	bool is_file;						//  수정
+	bool is_file;						/* 해당 inode_disk가 file용인지 directory용인지 구분 */
+	bool is_soft_link;					/* 해당 inode_disk가 soft link용으로 생성된 inode인지 확인*/
 	unsigned magic;                     /* Magic number. */
-	uint32_t unused[124];               /* Not used. */
+	char soft_link_path[495];               /* Not used. */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -110,6 +111,7 @@ inode_create (disk_sector_t sector, off_t length, bool is_file) {
 		size_t sectors = bytes_to_sectors (length);      // length (byte)를 섹터 단위(개수)로 변환
 		disk_inode->length = length;
 		disk_inode->is_file = is_file;					// 4-4-2
+		disk_inode->is_soft_link = false;
 		disk_inode->magic = INODE_MAGIC;
 #ifdef EFILESYS
 		static char zeros[DISK_SECTOR_SIZE];
@@ -419,4 +421,31 @@ inode_length (const struct inode *inode) {
 bool
 inode_is_dir (const struct inode* inode) {
 	return !inode->data.is_file;
+}
+
+bool
+inode_is_link (const struct inode* inode) {
+	return inode->data.is_soft_link;
+}
+
+bool
+inode_set_soft_link (disk_sector_t inode_sector, const char* target) {
+	bool result = false;
+	struct inode* inode = inode_open(inode_sector);
+	// inode 구조체를 메모리에서 할당하는데 실패할 경우
+	if (inode == NULL)
+		goto clean;
+	
+	// soft link 설정
+	inode->data.is_soft_link = true;
+	memcpy(inode->data.soft_link_path, target, strlen(target)+1);
+	result = true;
+clean:
+	inode_close(inode);
+	return result;
+}
+
+char *
+inode_change_to_soft_link_path (const struct inode* inode) {
+	return inode->data.soft_link_path;
 }
