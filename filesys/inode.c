@@ -22,7 +22,7 @@ struct inode_disk {
 	bool is_file;						/* 해당 inode_disk가 file용인지 directory용인지 구분 */
 	bool is_soft_link;					/* 해당 inode_disk가 soft link용으로 생성된 inode인지 확인 */
 	unsigned magic;                     /* Magic number. */
-	char soft_link_path[495];           /* 만약 soft link가 적용된 inode인 경우, 해당 path를 저장 */
+	char soft_link_path[496];           /* 만약 soft link가 적용된 inode인 경우, 해당 path를 저장 */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE

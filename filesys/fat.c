@@ -117,7 +117,6 @@ fat_close (void) {
          disk_write (filesys_disk, fat_fs->bs.fat_start + i, bounce);
          bytes_wrote += bytes_left;
          free (bounce);
-         
       }
    }
 }
@@ -170,7 +169,7 @@ fat_fs_init (void) {
    // fat_length : file system 안에 현재 사용할 수 있는 cluster의 수
    fat_fs->fat_length = (fat_fs->bs.total_sectors - fat_fs->bs.fat_sectors) / SECTORS_PER_CLUSTER;
    // data_start : 처음으로 file을 저장하기 시작할 수 있는 sector의 index
-   fat_fs->data_start = fat_fs->bs.fat_sectors + fat_fs->bs.fat_start + 1;
+   fat_fs->data_start = fat_fs->bs.fat_start + fat_fs->bs.fat_sectors + 1;
    lock_init(&fat_fs->write_lock);
 }
 
@@ -196,9 +195,9 @@ cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
 	cluster_t empty = find_empty_cluster();
+   // 비어있는 cluster를 찾지 못한 경우
    if (empty == 0)
       return 0;
-   static char zeros[DISK_SECTOR_SIZE];
    
    if (clst == 0) {  // 새로운 chain 시작
       fat_put(empty, EOChain);
@@ -207,6 +206,7 @@ fat_create_chain (cluster_t clst) {
       fat_put(clst, empty);
    }
    // FAT에 추가한 cluster를 바탕으로 disk상에서 공간 할당
+   static char zeros[DISK_SECTOR_SIZE];
    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
    return empty;
 }
@@ -249,8 +249,9 @@ fat_put (cluster_t clst, cluster_t val) {
 cluster_t
 fat_get (cluster_t clst) {
    /* TODO: Your code goes here. */
+   // error CLST check
    if (clst <= 0 || clst >= fat_fs->fat_length)
-      return 0;
+      PANIC("WRONG clst");
    return fat_fs->fat[clst];
 }
 

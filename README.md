@@ -12,4 +12,3 @@ File System
 
 * dir_open에서 calloc으로 dir를 만드는데, dir_close에서 free를 해주긴 함
     ->메모리 누수 안 일어나려면 close 확실하게 했는지 다시 한 번 더 확인!!!!!!
-* parse_path ㅈㄴ 똑같음.....
