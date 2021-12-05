@@ -196,8 +196,8 @@ cluster_t
 fat_create_chain (cluster_t clst) {
    /* TODO: Your code goes here. */
 	cluster_t empty = find_empty_cluster();
-   // if (empty == 0)
-   //    PANIC("error");
+   if (empty == 0)
+      return 0;
    static char zeros[DISK_SECTOR_SIZE];
    
    if (clst == 0) {  // 새로운 chain 시작
@@ -236,7 +236,7 @@ void
 fat_put (cluster_t clst, cluster_t val) {
    /* TODO: Your code goes here. */
    // clst 0은 Boot Sector용이라서 안 되고, clst가 FAT보다 큰 값이 들어오면 접근 불가!
-   if (clst >= fat_fs->fat_length)
+   if (clst <= 0 || clst >= fat_fs->fat_length)
       return;
    lock_acquire (&fat_fs->write_lock);
    fat_fs->fat[clst] = val;
@@ -249,7 +249,7 @@ fat_put (cluster_t clst, cluster_t val) {
 cluster_t
 fat_get (cluster_t clst) {
    /* TODO: Your code goes here. */
-   if (clst >= fat_fs->fat_length)
+   if (clst <= 0 || clst >= fat_fs->fat_length)
       return 0;
    return fat_fs->fat[clst];
 }

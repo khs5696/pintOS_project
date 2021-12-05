@@ -20,9 +20,9 @@ struct inode_disk {
 	// length : 저장된 공간의 길이(sector 단위)
 	off_t length;                       /* File size in bytes. */
 	bool is_file;						/* 해당 inode_disk가 file용인지 directory용인지 구분 */
-	bool is_soft_link;					/* 해당 inode_disk가 soft link용으로 생성된 inode인지 확인*/
+	bool is_soft_link;					/* 해당 inode_disk가 soft link용으로 생성된 inode인지 확인 */
 	unsigned magic;                     /* Magic number. */
-	char soft_link_path[495];               /* Not used. */
+	char soft_link_path[495];           /* 만약 soft link가 적용된 inode인 경우, 해당 path를 저장 */
 };
 
 /* Returns the number of sectors to allocate for an inode SIZE
@@ -62,13 +62,11 @@ byte_to_sector (const struct inode *inode, off_t pos) {
 	ASSERT (inode != NULL);
 	if (pos < inode->data.length) {
 		off_t cluster_num = pos / (DISK_SECTOR_SIZE*SECTORS_PER_CLUSTER);
-		off_t left_byte = pos % (DISK_SECTOR_SIZE*SECTORS_PER_CLUSTER);
 		// pos가 가리키는 위치의 sector로 이동
 		cluster_t loop_cluster = sector_to_cluster(inode->data.start);
-		for (int i = 0; i < cluster_num; i++) {
+		while (cluster_num > 0) {
 			loop_cluster = fat_get(loop_cluster);
-			if (loop_cluster == EOChain)
-				PANIC("Wrong EOChain in the middle of file");
+			cluster_num--;
 		}
 		disk_sector_t pos_sector = cluster_to_sector(loop_cluster);
 		return pos_sector;
@@ -101,12 +99,8 @@ inode_init (void) {
  * Returns true if successful.
  * Returns false if memory or disk allocation fails. */
  /* 4-2-4 inode_create를 FAT style로 변경 */
- /* 한양대 : dir_create(), filesys_create()에서 모두 inode_create()를 호출
-		   : inode_create에서 해당 inode가 directory 용도인지 file 용도인지
-		   : 를 확인하기 위해 parameter로 bool 값을 하나 더 받도록 수정
- */
 bool
-inode_create (disk_sector_t sector, off_t length, bool is_file) {
+inode_create (disk_sector_t sector, off_t length, bool is_file_inode) {
 	struct inode_disk *disk_inode = NULL;
 	bool success = false;
 
@@ -121,39 +115,39 @@ inode_create (disk_sector_t sector, off_t length, bool is_file) {
 		// inode_disk 구조체 초기화 (start, length, magic)
 		size_t sectors = bytes_to_sectors (length);      // length (byte)를 섹터 단위(개수)로 변환
 		disk_inode->length = length;
-		disk_inode->is_file = is_file;					// 4-4-2
+		disk_inode->is_file = is_file_inode;					// 4-4-2
 		disk_inode->is_soft_link = false;
 		disk_inode->magic = INODE_MAGIC;
 #ifdef EFILESYS
 		static char zeros[DISK_SECTOR_SIZE];
 
-		// last_clst가 가리키고 있는 empty list의 제일 첫번째 cluster에 EOChain을 넣고,
-		//  그 cluster return
-		cluster_t start = fat_create_chain(0);
-		// start에 매칭되는 disk 상의 sector를 0으로 채움
-		disk_write(filesys_disk, cluster_to_sector(start), zeros);
-
-		disk_inode->start = cluster_to_sector(start);
+		// 실제 데이터를 저장할 sector 할당
+		cluster_t act_data_start = fat_create_chain(0);
+		// fat_create_chain fail
+		if (act_data_start == 0) {
+			free(disk_inode);
+			return success;
+		}
+		disk_inode->start = cluster_to_sector(act_data_start);
 		disk_write (filesys_disk, sector, disk_inode);
 		cluster_t clst_length = sectors / SECTORS_PER_CLUSTER;
 
 		// file을 위한 cluster를 할당하는 중에 더이상 할당하지 못하게 된 경우,
 		// 지금까지 만들었던 chain이 없었던 처음으로 다시 돌려야함. 이를 위해
 		// chain의 처음을 기억하고 이후 fat_remove_chain(__, 0);을 사용.
-		cluster_t original_start = start;
-
+		cluster_t original_start = act_data_start;
 		while (clst_length > 1) {
-			start = fat_create_chain(start);
-			if (start == 0) {	// 중간에 empty cluster 찾지 못한 경우
+			act_data_start = fat_create_chain(act_data_start);
+			if (act_data_start == 0) {	// 중간에 empty cluster 찾지 못한 경우
 				fat_remove_chain(original_start, 0);
 				free (disk_inode);
 				return success;
 			}
 			clst_length--;
-			disk_write(filesys_disk, cluster_to_sector(start), zeros);
 		}
-		free (disk_inode);
 		success = true;
+		// clean up
+		free(disk_inode);
 		return success;
 #else
 		// free_map_allocate()를 FAT 기반으로 대체
@@ -232,7 +226,7 @@ inode_close (struct inode *inode) {
 	/* Ignore null pointer. */
 	if (inode == NULL)
 		return;
-
+	
 	disk_write (filesys_disk, inode->sector, &inode->data);
 
 	/* Release resources if this was the last opener. */
@@ -334,25 +328,26 @@ inode_write_at (struct inode *inode, const void *buffer_, off_t size,
 		cluster_t total_length = DIV_ROUND_UP (size + offset, DISK_SECTOR_SIZE * SECTORS_PER_CLUSTER);
 		cluster_t need_length = total_length - current_length;
 
+		/* 현재 아무런 data가 저장되어 있지 않은 경우, sector 하나가 할당되어있고,
+		 * 거기에 아무것도 쓰여있지 않은 상태. 해당 sector부터 data를 추가하면 됨
+		 * 으로 추가적으로 필요한 length를 1개 줄여줌. */
 		if (inode->data.length == 0)
 			need_length--;
-
-		//printf("hello2\n");
 
 		cluster_t end_clst = sector_to_cluster(inode->data.start);
 
 		while(fat_get(end_clst) != EOChain)
 			end_clst = fat_get(end_clst);
-
-		// while(current_length > 1) {
-		//    end_clst = fat_get(end_clst);
-		//    current_length--;
-		// }
-		// data.length가 0인 경우?
-		// cluster_t extend_clst = inode->data.length ? new_clst - old_clst : new_clst - old_clst - 1;
-
+		
+		cluster_t original_end = end_clst;
 		while (need_length > 0) {
 			end_clst = fat_create_chain(end_clst);
+			// fat_create_chain fail
+			if (end_clst == 0) {
+				if (fat_get(original_end) != EOChain)	// loop돌면서 하나라도 추가된 경우
+					fat_remove_chain(fat_get(original_end), original_end);
+				return 0;
+			}
 			need_length--;
 		}
 		inode->data.length = size + offset;

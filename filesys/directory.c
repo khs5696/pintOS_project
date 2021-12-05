@@ -285,6 +285,8 @@ dir_change (const char* dir) {
 
 	// /* name 경로 분석 */
 	char * file_name = (char *) malloc(NAME_MAX+1);
+	if (file_name == NULL)
+		return false;
 	struct dir * target_dir = search_target_dir(dir, file_name);
 	
 	// filesystem에서 target_dir을 찾아봤는데 없는 경우
