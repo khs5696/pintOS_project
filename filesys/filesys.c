@@ -34,11 +34,7 @@ filesys_init (bool format) {
 		do_format ();
 
 	fat_open ();
-	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 root directry로 설정 
-			: dir_open_root()
-	*/
-	// 유섭인 do_format 안에 위치 (x)
-	// persistance case 에서 -f가 없으면 안돼서 do_format에서는 추가 안 함
+   // 최초 thread의 시작 directory는 Root Directory
 	thread_current()->work_dir = dir_open_root();
 #else
 	/* Original FS */
@@ -76,39 +72,27 @@ filesys_done (void) {
 bool
 filesys_create (const char * name, off_t initial_size) {
    disk_sector_t inode_sector = 0;
-   /* 한양대 : 이 부분 변경 필요!
-           : root directory에만 생성하던 것을 'name' 경로에 
-           : '.', '..' 기능의 file 구현
-           : '/' 로 구분해서 절대, 상대 경로 기능 구현
-           : 'name' 원본을 보존해주기 위해(왜 해줘야하는 지는 모르겠음) 'name'을 다른 변수에 복사!
-   */
    // parsing process : 경로 & 파일
-   char * whole_input = (char *) malloc(strlen(name) + 1);
-   char * target_file = (char *) malloc(sizeof(char)*(NAME_MAX+1));
-   struct dir * target_dir;
+   char * create_file = (char *) malloc(NAME_MAX+1);
+   struct dir * target_dir = search_target_dir(name, create_file);
+   
+   // directory path가 유효한 경로인지 확인
+   if (target_dir == NULL)
+      goto clean;
 
-   if (strlen(name) < NAME_MAX)
-      memcpy(whole_input, name, strlen(name) + 1);
-   else
-      memcpy(whole_input, name, NAME_MAX + 1);
-
-   target_dir = token_target(whole_input, target_file);
-
-// 새로운 file을 생성하기 위해 inode_disk가 만들어질 새로운 공간이 필요하므로,
-// fat_create_chain(0) 호출 -> cluster를 리턴하기 때문에 sector로 변환
-// inode_create에서 inode를 disk에 저장하고 initial_size가 포함되는 sector를 할당해 0으로 초기화
-   bool success = (target_dir != NULL
-         && (inode_sector = cluster_to_sector(fat_create_chain(0)))
+   // 새로운 file을 생성하기 위해 inode_disk가 만들어질 새로운 공간이 필요하므로,
+   // fat_create_chain(0) 호출 -> cluster를 리턴하기 때문에 sector로 변환
+   // inode_create에서 inode를 disk에 저장하고 initial_size가 포함되는 sector를 할당해 0으로 초기화
+   bool success = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
          && inode_create (inode_sector, initial_size, true)
-         && dir_add (target_dir, target_file, inode_sector));
+         && dir_add (target_dir, create_file, inode_sector));
    if (!success && inode_sector != 0)
       fat_remove_chain(sector_to_cluster(inode_sector), 0);
 
-   dir_close (target_dir);
-
-   free(whole_input);
-   free(target_file);
-
+clean:
+   free(create_file);
+   // target_dir == NULL이어도 지장 없음
+   dir_close(target_dir);
    return success;
 }
 #else
@@ -139,45 +123,39 @@ filesys_create (const char *name, off_t initial_size) {
 struct file *
 filesys_open (const char *name) {
    // 절대경로를 입력한 경우 root directory 오픈
-   if(strcmp(name, "/") == 0)
+   if (strcmp(name, "/") == 0)
       return dir_open_root();
    
+   struct file * result = NULL;
+
    // parsing process : 경로 & 파일
-   char * whole_input = (char *) malloc(strlen(name) + 1);
-   char * target_file = (char *) malloc(sizeof(char)*(NAME_MAX+1));
-   struct dir * target_dir;
-   struct inode * target_inode = NULL;
-
-   if (strlen(name) < NAME_MAX)
-      memcpy(whole_input, name, strlen(name) + 1);
-   else
-      memcpy(whole_input, name, NAME_MAX + 1);
-
-   target_dir = token_target(whole_input, target_file);
-
-   // directory path가 유효한 경로인지 확인
-   if (target_dir == NULL)
-      goto done;
+   char * target_file = (char *) malloc(NAME_MAX+1);
+   struct dir * target_dir = search_target_dir(name, target_file);
    
+   // directory path가 유효한 경로인지 확인
+   if (target_dir == NULL) {
+      // printf("directory path is wrong\n");
+      goto clean;
+   }
+
+   struct inode * target_inode = NULL;
    // target_file이 directory path에 존재하는지 확인
    dir_lookup(target_dir, target_file, &target_inode);
-   if (target_inode == NULL)
-      goto done;
-
+   if (target_inode == NULL) {
+      // printf("there is no such file\n");
+      goto clean;
+   }
    // target_file이 soft_link인 경우
    if (inode_is_link(target_inode))
       return filesys_open(inode_change_to_soft_link_path(target_inode));
 
-   dir_close(target_dir);
-   free(whole_input);
-   free(target_file);
-   return file_open(target_inode);
+   result = file_open(target_inode);
 
-done:
-   dir_close(target_dir);
-   free(whole_input);
+clean:
    free(target_file);
-   return NULL;
+   // target_dir == NULL이어도 지장 없음
+   dir_close(target_dir);
+   return result;
 }
 #else
 struct file *
@@ -201,10 +179,10 @@ filesys_open (const char *name) {
 #ifdef EFILESYS
 bool
 filesys_remove (const char *name) {
-   // target_file은 몰라도 whole_input은 제한 없어야 하는 거 아님?!?!?!?!??!?!?!
    // 절대경로로 Root Directory를 지우려고 하는 경우
-   if(strcmp(name, "/") == 0)
+   if (strcmp(name, "/") == 0)
       return false;
+   
    // parsing process : 경로 & 파일
    char * whole_input = (char *) malloc(strlen(name) + 1);
    char * target_file = (char *) malloc(sizeof(char)*(NAME_MAX+1));
@@ -286,7 +264,6 @@ do_format (void) {
    printf ("done.\n");
 }
 
-// 함수 이름 바꿔야함!!!!!!!!!!!!!!!!
 struct dir *
 token_target (char * whole_input, char * target_file) {
    // 'whole_input'을 분석해서 앞으로 작업을 진행할 directory를 리턴
@@ -418,7 +395,7 @@ filesys_create_dir (const char* name) {
    struct dir * target_dir = search_target_dir(name, file_name);
    
    // filesystem에서 target_dir을 찾아봤는데 없는 경우
-   if(target_dir == NULL)
+   if (target_dir == NULL)
       goto clean;
    
    struct inode * final_inode;
@@ -467,7 +444,7 @@ filesys_make_soft_link(const char* target, const char* linkpath) {
    struct dir * target_dir = search_target_dir(linkpath, file_name);
    
    // filesystem에서 target_dir을 찾아봤는데 없는 경우
-   if(target_dir == NULL)
+   if (target_dir == NULL)
       goto clean;
    
    disk_sector_t inode_sector;
@@ -482,7 +459,7 @@ filesys_make_soft_link(const char* target, const char* linkpath) {
       goto clean;
    }
    // soft link 연결까지 성공
-   if(inode_set_soft_link(inode_sector, target))
+   if (inode_set_soft_link(inode_sector, target))
       result = 0;
 
 clean:

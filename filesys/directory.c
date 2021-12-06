@@ -35,8 +35,8 @@ struct dir *
 dir_open (struct inode * inode) {
 	struct dir * dir = calloc(1, sizeof * dir);
     if (inode != NULL && dir != NULL) {
-      // HS. inode가 directory에 대한 inode인지
-      ASSERT(inode_is_dir(inode))
+		// HS. inode가 directory에 대한 inode인지
+		ASSERT(inode_is_dir(inode))
 
     	dir->inode = inode;
         dir->pos = 0;
@@ -124,10 +124,10 @@ dir_lookup (const struct dir * dir, const char * name,
 
 	if (lookup(dir, name, &e, NULL))
 		* inode = inode_open(e.inode_sector);
-		else
-			* inode = NULL;
+	else
+		* inode = NULL;
 
-		return * inode != NULL;
+	return * inode != NULL;
 }
 
 /* Adds a file named NAME to DIR, which must not already contain a
@@ -277,7 +277,7 @@ bool
 dir_change (const char* dir) {
 	bool result = false;
 	// Root Directory로 이동하고자 하는 경우
-	if(!strcmp(dir, "/")) {
+	if (!strcmp(dir, "/")) {
 		dir_close(thread_current()->work_dir);
 		thread_current()->work_dir = dir_open_root();
 		return true;
@@ -290,7 +290,7 @@ dir_change (const char* dir) {
 	struct dir * target_dir = search_target_dir(dir, file_name);
 	
 	// filesystem에서 target_dir을 찾아봤는데 없는 경우
-	if(target_dir == NULL)
+	if (target_dir == NULL)
 		goto clean;
 
 	struct inode * lookup_inode;
