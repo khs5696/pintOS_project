@@ -22,7 +22,7 @@ struct fat_fs {
    unsigned int *fat;
    unsigned int fat_length;
    disk_sector_t data_start;
-   cluster_t last_clst; /* 비어있는 cluster는 동일하게 linked-list형태로 연결. 그 list의 가장 앞 cluster */
+   cluster_t last_clst;
    struct lock write_lock;
 };
 
@@ -85,7 +85,8 @@ fat_open (void) {
    }
 }
 
-// 4-0-6 생성해준 FAT를 다시 닫음 -> 마지막에 disk에 저장하기 때문에, memory에서 생성한 FAT를 disk에 저장하는 역할도 함.
+// 4-0-6 생성해준 FAT를 다시 닫음 -> 마지막에 disk에 저장하기 때문에, 
+// memory에서 생성한 FAT를 disk에 저장하는 역할도 함.
 void
 fat_close (void) {
    // Write FAT boot sector
@@ -94,7 +95,7 @@ fat_close (void) {
       PANIC ("FAT close failed");
    // fat_fs.bs의 내용을 bounce에 복사
    memcpy (bounce, &fat_fs->bs, sizeof (fat_fs->bs));
-   // FAT_BOOT_SECTOR의 내용을 0으로 밀어버리는 역할
+   // FAT_BOOT_SECTOR에 fat_fs->bs를 저장
    disk_write (filesys_disk, FAT_BOOT_SECTOR, bounce);
    free (bounce);
 
@@ -205,7 +206,7 @@ fat_create_chain (cluster_t clst) {
       fat_put(empty, EOChain);
       fat_put(clst, empty);
    }
-   // FAT에 추가한 cluster를 바탕으로 disk상에서 공간 할당
+   // FAT에 추가한 cluster를 바탕으로 disk 상에서 공간 할당
    static char zeros[DISK_SECTOR_SIZE];
    disk_write(filesys_disk, cluster_to_sector(empty), zeros);
    return empty;

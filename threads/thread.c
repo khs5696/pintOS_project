@@ -130,7 +130,6 @@ thread_init (void) {
 	// HS 1-1-0. 잠자는 스레드들의 목록 초기화
 	list_init(&sleep_list);
 
-	/* 한양대 : 현재 작업중인 directory를 나타내는 property에 NULL 대입 */
 	initial_thread->work_dir = NULL;
 }
 
@@ -214,10 +213,7 @@ thread_create (const char *name, int priority,
 	tid = t->tid = allocate_tid ();
 
 #ifdef EFILESYS
-	/* 한양대 : thread를 새로 생성할 때, 현재 thread(=이제 부모 thread가 될 thread)
-			  : 의 작업 directory가 NULL이 아닐 경우, 자식도 똑같이 부모의 directory
-			  : 를 다시 오픈해서 설정
-	*/
+	// thread가 생성될 때, 부모가 작업 중이던 directory 그대로 상속
 	if (thread_current()->work_dir != NULL)
 		t->work_dir = dir_reopen(thread_current()->work_dir);
 #endif

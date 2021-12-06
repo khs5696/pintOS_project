@@ -15,7 +15,6 @@
  * Must be exactly DISK_SECTOR_SIZE bytes long. */
 struct inode_disk {
 	// start : file에 대한 inode인 경우 파일의 실제 내용을, directory에 대한 inode인 경우 directory entry가 저장된 sector 번호를 나타냄.
-	/* 한양대 : file에 대한 inode인지, directory에 대한 inode인지 구분하는 property 필요 */
 	disk_sector_t start;                /* First data sector. */
 	// length : 저장된 공간의 길이(sector 단위)
 	off_t length;                       /* File size in bytes. */
@@ -51,11 +50,11 @@ struct inode {
  * INODE.
  * Returns -1 if INODE does not contain data for a byte at offset
  * POS. */
- /* 4-2-2 file의 길이는 1 sector로 제한되지 않는다. byte_to_sector에서 
- 		  모든 file을 위한 sector는 연결되어 있는 것으로 가정하고 계산한다.
-		  FAT에서는 linked-list를 이용해 하나의 file을 위한 sector를 
-		  떨어트려 놓을 수 있음으로이를 적용한다.
- */
+/* 4-2-2 file의 길이는 1 sector로 제한되지 않는다. byte_to_sector에서 
+		모든 file을 위한 sector는 연결되어 있는 것으로 가정하고 계산한다.
+		FAT에서는 linked-list를 이용해 하나의 file을 위한 sector를 
+		떨어트려 놓을 수 있음으로 이를 적용한다.
+*/
 #ifdef EFILESYS
 static disk_sector_t
 byte_to_sector (const struct inode *inode, off_t pos) {

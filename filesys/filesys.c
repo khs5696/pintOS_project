@@ -63,11 +63,10 @@ filesys_done (void) {
  * Returns true if successful, false otherwise.
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
- // 4-2-0 create syscall에서 사용되던 filesys_create 수정
- /* 4-4-2 파일 혹은 디렉토리 생성시 사용
-        현재 dir는 무조건 root directory -> root direct
-        ory만 생성하겠다는 뜻 -> 이걸 바꿔야함!
-*/
+// 4-2-0 create syscall에서 사용되던 filesys_create 수정
+/* 4-4-2 파일 혹은 디렉토리 생성시 사용
+         현재 dir는 무조건 root directory -> root direct
+         ory만 생성하겠다는 뜻 -> 이걸 바꿔야함! */
 #ifdef EFILESYS
 bool
 filesys_create (const char * name, off_t initial_size) {
@@ -133,18 +132,15 @@ filesys_open (const char *name) {
    struct dir * target_dir = search_target_dir(name, target_file);
    
    // directory path가 유효한 경로인지 확인
-   if (target_dir == NULL) {
-      // printf("directory path is wrong\n");
+   if (target_dir == NULL)
       goto clean;
-   }
 
    struct inode * target_inode = NULL;
    // target_file이 directory path에 존재하는지 확인
    dir_lookup(target_dir, target_file, &target_inode);
-   if (target_inode == NULL) {
-      // printf("there is no such file\n");
+   if (target_inode == NULL) 
       goto clean;
-   }
+   
    // target_file이 soft_link인 경우
    if (inode_is_link(target_inode))
       return filesys_open(inode_change_to_soft_link_path(target_inode));
@@ -195,13 +191,7 @@ filesys_remove (const char *name) {
 
    target_dir = token_target(whole_input, target_file);
 
-   /*
-      디렉터리엔트리에서file_name의in-memory inode가파일/디렉터리인지판단
-      inode가디렉터리일경우디렉터리내파일존재여부검사
-      디렉터리내파일이존재하지않을경우, 디렉터리에서file_name의엔트리삭제
-      inode가파일일경우디렉터리엔트리에서file_name엔트리삭제
-   */
-   bool success = target_dir != NULL && dir_remove (target_dir, target_file);
+   bool success = target_dir != NULL && dir_remove(target_dir, target_file);
    dir_close (target_dir);
 
    free(whole_input);
@@ -268,11 +258,7 @@ struct dir *
 token_target (char * whole_input, char * target_file) {
    // 'whole_input'을 분석해서 앞으로 작업을 진행할 directory를 리턴
    // 'target_file' : 'whole_input'을 분석한 결과로 앞의 경로에 대한 정보를 제거하고 순수하게 만들
-   //             : 것에 대한 이름을 저장
-   // 'whole_input'의 시작이 ‘/’의 여부에 따라 절대, 상대경로 구분하여 디렉토리 정보를 dir에 저장
-   // strtok_r() 함수를 이용하여 'whole_input'의 디렉토리 정보와 파일 이름 저장
-   // 'target_file'에 파일 이름 저장
-   // 'target_dir'로 오픈된 디렉토리를 포인팅
+   //               : 것에 대한 이름을 저장
    struct dir * target_dir;
    struct dir * current_dir = thread_current()->work_dir;
    char * command;
@@ -287,14 +273,14 @@ token_target (char * whole_input, char * target_file) {
    if (strlen(whole_input) == 0)
       return NULL;
    
-   /* 'whole_input'의 절대/상대 경로에 따른 디렉토리 정보 저장 */
+   /* 'whole_input'의 절대 or 상대 경로에 따른 디렉토리 정보 저장 */
    if (whole_input[0] == '/') {   // 절대 경로
       target_dir = dir_open_root();
       whole_input += 1;
-   } else                     // 상대 경로
+   } else                         // 상대 경로
       target_dir = dir_reopen(current_dir);
 
-   // 2. whole_input으로 "/"나 "."가 들어온 경우: dir 위에서 설정한 대로 리턴, target_file은 변화 없음.
+   // 2. whole_input으로 "/"가 들어온 경우: dir 위에서 설정한 대로 리턴, target_file은 변화 없음.
    if (strlen(whole_input) == 0)
       return target_dir;
 
@@ -303,7 +289,7 @@ token_target (char * whole_input, char * target_file) {
    remain_command = strtok_r(NULL, "/", &parsing_ptr);
 
    while (command != NULL && remain_command != NULL) {
-      /* dir에서 token이름의 파일을 검색하여 inode의 정보를 저장 */
+      /* dir에서 command라는 이름의 파일을 검색하여 inode의 정보를 저장 */
       dir_lookup(target_dir, command, &check_entry);
 
       // dir_lookup을 했는데 해당 경로가 존재하지 않거나,
@@ -354,7 +340,7 @@ token_target (char * whole_input, char * target_file) {
       remain_command = strtok_r(NULL, "/", &parsing_ptr);
    }
    /* ideal: token = 실제 저장하고자 하는 file(or directory)의 이름
-    *         remain_command = NULL */
+    *        remain_command = NULL */
    /* token의 파일 이름을 file_name에 저장(file의 이름에는 제한 유지) */
    int file_name_len = NAME_MAX > strlen(command) ? strlen(command) + 1 : NAME_MAX + 1;
    memcpy(target_file, command, file_name_len);
@@ -371,7 +357,7 @@ clean:
 }
 
 struct dir *
-search_target_dir(char * name, char * file_name) {
+search_target_dir (char * name, char * file_name) {
    // name과 file_name 모두 NULL이면 안됨
    ASSERT(name != NULL && file_name != NULL);
 
@@ -390,17 +376,17 @@ bool
 filesys_create_dir (const char* name) {
    bool success = false;
 
-   /* name 경로 분석 */
-   char * file_name = (char *) malloc(NAME_MAX+1);
-   struct dir * target_dir = search_target_dir(name, file_name);
+   // parsing process : 경로 & 파일
+   char * create_dir_name = (char *) malloc(NAME_MAX+1);
+   struct dir * target_dir = search_target_dir(name, create_dir_name);
    
-   // filesystem에서 target_dir을 찾아봤는데 없는 경우
+   // directory path가 유효한 경로인지 확인
    if (target_dir == NULL)
       goto clean;
    
    struct inode * final_inode;
    disk_sector_t inode_sector;
-   dir_lookup (target_dir, file_name, &final_inode);
+   dir_lookup (target_dir, create_dir_name, &final_inode);
 
    // 이미 만들고자 하는 directory가 존재하는 경우
    if (final_inode != NULL) {
@@ -414,7 +400,7 @@ filesys_create_dir (const char* name) {
             // 할당받은 inode_sector에 directory용 inode 저장
             && dir_create (inode_sector, 0)
             /* 디렉토리 엔트리에 file_name의 엔트리 추가 */
-            && dir_add (target_dir, file_name, inode_sector));
+            && dir_add (target_dir, create_dir_name, inode_sector));
    
    if (!success && inode_sector != 0) {
       fat_remove_chain(sector_to_cluster(inode_sector), 0);
@@ -426,7 +412,7 @@ filesys_create_dir (const char* name) {
 
    dir_close(final_dir);
 clean:
-   free(file_name);
+   free(create_dir_name);
    // target_dir == NULL이어도 지장 없음
    dir_close(target_dir);
    return success;
@@ -439,18 +425,18 @@ filesys_make_soft_link(const char* target, const char* linkpath) {
    if (target == NULL || linkpath == NULL || strlen(target) == 0 || strlen(linkpath) == 0)
       return result;
 
-   /* name 경로 분석 */
+   // parsing process : 경로 & 파일
    char * file_name = (char *) malloc(NAME_MAX+1);
    struct dir * target_dir = search_target_dir(linkpath, file_name);
    
-   // filesystem에서 target_dir을 찾아봤는데 없는 경우
+   // directory path가 유효한 경로인지 확인
    if (target_dir == NULL)
       goto clean;
    
    disk_sector_t inode_sector;
    bool success = ((inode_sector = cluster_to_sector(fat_create_chain(0)))
             // 할당받은 inode_sector에 file용 inode 저장
-            && inode_create (inode_sector, 0, false)
+            && inode_create (inode_sector, 0, true)
             /* 디렉토리 엔트리에 file_name의 엔트리 추가 */
             && dir_add (target_dir, file_name, inode_sector));
    // 실제 inode를 생성해서 directory에 저장하는 것은 실패했지만, fat상으로는 disk 공간을 할당한 경우

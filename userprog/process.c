@@ -442,7 +442,7 @@ process_exit (void) {
 	sema_up(&curr->waiting_child_sema);
 
 #ifdef EFILESYS
-	/* 한양대 : thread의 현재 작업중인 directory에 대해 저장하고 있던 정보를 해지 */
+	// process가 종료될 때 최종적으로 작업중이던 directory까지 close
 	dir_close(curr->work_dir);
 #endif
 
